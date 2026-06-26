@@ -2,6 +2,8 @@ import "server-only";
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, writeBatch } from "firebase/firestore";
+import { getDadosLocaisDb } from "./firebase";
 import type { AnaliseDadosLocais, CidadeLocal, EstrategiaPNVALocal, FiltroListaLocal } from "./types";
 
 type RegistroLocal = {
@@ -14,6 +16,7 @@ type RegistroLocal = {
 };
 
 type SnapshotLocal = {
+  versao?: number;
   sincronizadoEm?: string;
   limiteLeituras?: number;
   leiturasExecutadas?: number;
@@ -23,8 +26,108 @@ type SnapshotLocal = {
 };
 
 const SNAPSHOT_PATH = path.join(process.cwd(), "data", "dados-locais-vendas.json");
+const COLECAO_FIREBASE = "sistemaantigo";
+const METADADOS_DOC_ID = "__snapshot";
 const COLECAO_OFICIAL = "Betodespachanteintrncaodevendaoficial";
 const COLECAO_DIGITAL = "Betodespachanteintrncaodevendaoficialdigital";
+
+async function carregarSnapshotLocal() {
+  const content = await readFile(SNAPSHOT_PATH, "utf8");
+  return JSON.parse(content.replace(/^\uFEFF/, "")) as SnapshotLocal;
+}
+
+async function carregarSnapshotFirebase() {
+  const db = getDadosLocaisDb();
+  if (!db) return null;
+
+  const metadadosDoc = await getDoc(doc(db, COLECAO_FIREBASE, METADADOS_DOC_ID));
+  const docs = await getDocs(query(collection(db, COLECAO_FIREBASE), orderBy("indice")));
+  let metadados: Omit<SnapshotLocal, "registros"> = {};
+  const registros: RegistroLocal[] = [];
+
+  if (metadadosDoc.exists()) {
+    const data = { ...(metadadosDoc.data() as SnapshotLocal) };
+    delete data.registros;
+    metadados = data;
+  }
+
+  docs.forEach((snapshotDoc) => {
+    const data = snapshotDoc.data();
+    registros.push({
+      colecao: typeof data.colecao === "string" ? data.colecao : undefined,
+      cepComprador: typeof data.cepComprador === "string" ? data.cepComprador : undefined,
+      municipioComprador: typeof data.municipioComprador === "string" ? data.municipioComprador : undefined,
+      dataCriacao: typeof data.dataCriacao === "string" || data.dataCriacao === null ? data.dataCriacao : undefined,
+      concluido: typeof data.concluido === "boolean" ? data.concluido : undefined,
+      status: typeof data.status === "string" ? data.status : undefined,
+    });
+  });
+
+  return registros.length ? { ...metadados, registros } satisfies SnapshotLocal : null;
+}
+
+async function carregarSnapshotDadosLocais() {
+  try {
+    const firebaseSnapshot = await carregarSnapshotFirebase();
+    if (firebaseSnapshot) return firebaseSnapshot;
+  } catch (error) {
+    console.error("Falha ao carregar dados locais do Firebase. Usando JSON local.", error);
+  }
+
+  return carregarSnapshotLocal();
+}
+
+function documentoRegistroId(index: number) {
+  return `registro-${String(index + 1).padStart(5, "0")}`;
+}
+
+export async function sincronizarDadosLocaisComFirebase() {
+  const db = getDadosLocaisDb();
+  if (!db) {
+    throw new Error("Firebase nao configurado. Preencha as variaveis FIREBASE_* no ambiente.");
+  }
+
+  const snapshot = await carregarSnapshotLocal();
+  const registros = snapshot.registros || [];
+  await setDoc(doc(db, COLECAO_FIREBASE, METADADOS_DOC_ID), {
+    versao: snapshot.versao || 1,
+    sincronizadoEm: snapshot.sincronizadoEm || null,
+    limiteLeituras: snapshot.limiteLeituras || null,
+    leiturasExecutadas: snapshot.leiturasExecutadas || registros.length,
+    truncado: snapshot.truncado === true,
+    colecoes: snapshot.colecoes || {},
+    atualizadoEm: new Date().toISOString(),
+  });
+
+  let batch = writeBatch(db);
+  let operacoes = 0;
+
+  for (const [index, record] of registros.entries()) {
+    batch.set(doc(db, COLECAO_FIREBASE, documentoRegistroId(index)), {
+      indice: index,
+      colecao: record.colecao || null,
+      cepComprador: record.cepComprador || null,
+      municipioComprador: record.municipioComprador || null,
+      dataCriacao: record.dataCriacao || null,
+      concluido: record.concluido === true,
+      status: record.status || null,
+    });
+    operacoes += 1;
+
+    if (operacoes === 450) {
+      await batch.commit();
+      batch = writeBatch(db);
+      operacoes = 0;
+    }
+  }
+
+  if (operacoes) await batch.commit();
+
+  return {
+    colecao: COLECAO_FIREBASE,
+    registrosEnviados: registros.length,
+  };
+}
 
 function nomeDoFiltro(filtro: FiltroListaLocal) {
   if (filtro === "oficial") return "Somente lista oficial";
@@ -281,8 +384,7 @@ function montarEstrategiaPNVA(params: {
 export async function carregarAnaliseDadosLocais(filtro: FiltroListaLocal = "todas"): Promise<AnaliseDadosLocais> {
   let snapshot: SnapshotLocal;
   try {
-    const content = await readFile(SNAPSHOT_PATH, "utf8");
-    snapshot = JSON.parse(content.replace(/^\uFEFF/, "")) as SnapshotLocal;
+    snapshot = await carregarSnapshotDadosLocais();
   } catch {
     return {
       disponivel: false,
