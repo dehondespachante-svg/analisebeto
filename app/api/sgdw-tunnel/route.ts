@@ -4,7 +4,7 @@ const TOKEN = "6ad74bc2cdc8d84953ea21ad89c25715d49ad614757b8aea5c599050b5d6e6dc"
 // Firebase Realtime Database — persiste sem precisar de regras Firestore
 const RTDB = "https://beto-58a10-default-rtdb.firebaseio.com/sgdw-tunnel.json";
 // URL de producao — usada como fallback quando rodando localmente (dev server)
-const PROD_API = "https://analisebeto.vercel.app/api/sgdw-tunnel";
+const PROD_API = "https://analise-inky.vercel.app/api/sgdw-tunnel";
 
 // Cache em memoria — sobrevive enquanto o container Vercel / dev server estiver quente
 let memCache: { url: string; at: number } | null = null;
