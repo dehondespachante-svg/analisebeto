@@ -263,8 +263,6 @@ function montarEstrategiaPNVA(params: {
         : `${Math.round(concentracaoTop2 * 1000) / 10}% dos compradores`;
 
   return {
-    versao: "pnva-core-dados-locais-v1",
-    responsavel: "Gustavo Martins",
     confianca,
     diagnostico: `${cities[0]?.cidade || "A primeira cidade"} e ${cities[1]?.cidade || "a segunda cidade"} juntas trazem ${leituraConcentracao}.`,
     proximaAcao: `Comece por ${cities[0]?.cidade || "a cidade lider"}. Depois repita o que funcionar em ${cities[1]?.cidade || "a segunda cidade"}.`,

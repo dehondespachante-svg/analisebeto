@@ -247,7 +247,7 @@ export function extrairIntervaloFonte(texto: string): IntervaloFonte | null {
 function parseMesAnoTexto(valor: string) {
   const normalizado = normalizarBusca(valor);
   const matchNome = normalizado.match(
-    /\b(jan(?:eiro)?|fev(?:ereiro)?|mar(?:co)?|abr(?:il)?|mai(?:o)?|jun(?:ho)?|jul(?:ho)?|ago(?:sto)?|set(?:embro)?|out(?:ubro)?|nov(?:embro)?|dez(?:embro)?)\s*[\/_-]\s*(\d{2,4})\b/
+    /\b(jan(?:eiro)?|fev(?:ereiro)?|mar(?:co)?|abr(?:il)?|mai(?:o)?|jun(?:ho)?|jul(?:ho)?|ago(?:sto)?|set(?:embro)?|out(?:ubro)?|nov(?:embro)?|dez(?:embro)?)\s*[\/_-]\s*(\d{4})\b/
   );
 
   if (matchNome) {
@@ -268,6 +268,47 @@ function parseMesAnoTexto(valor: string) {
   return null;
 }
 
+function parseMesNomeTexto(valor: string) {
+  const normalizado = normalizarBusca(valor);
+  const matchNome = normalizado.match(
+    /\b(jan(?:eiro)?|fev(?:ereiro)?|mar(?:co)?|abr(?:il)?|mai(?:o)?|jun(?:ho)?|jul(?:ho)?|ago(?:sto)?|set(?:embro)?|out(?:ubro)?|nov(?:embro)?|dez(?:embro)?)\b/
+  );
+
+  return matchNome ? mesesPorNome[matchNome[1]] || 0 : 0;
+}
+
+function extrairCorteDiaNomeArquivo(nomeArquivo: string, mes: number, ano: number): IntervaloFonte | null {
+  if (!mes || !ano) return null;
+
+  const normalizado = normalizarBusca(nomeArquivo);
+  const nomeMes = Object.entries(mesesPorNome)
+    .filter(([, numero]) => numero === mes)
+    .map(([nome]) => nome)
+    .sort((a, b) => b.length - a.length)[0];
+  if (!nomeMes) return null;
+
+  const matchDia = normalizado.match(new RegExp(`\\b${nomeMes}\\s*[_-]\\s*(\\d{1,2})(?:\\D|$)`));
+  const diaFinal = matchDia ? Number(matchDia[1]) : 0;
+  const ultimoDia = new Date(ano, mes, 0).getDate();
+  if (diaFinal < 1 || diaFinal > ultimoDia) return null;
+
+  const inicio = `${doisDigitos(1)}/${doisDigitos(mes)}/${ano}`;
+  const fim = `${doisDigitos(diaFinal)}/${doisDigitos(mes)}/${ano}`;
+
+  return {
+    ano,
+    anoFinal: ano,
+    mesNumero: mes,
+    mesFinal: mes,
+    diaInicial: 1,
+    diaFinal,
+    inicio,
+    fim,
+    label: `${inicio} a ${fim}`,
+    corte: `${doisDigitos(1)}-${doisDigitos(diaFinal)}`,
+  };
+}
+
 function formatarBrMoedaNumero(valor: number) {
   return valor.toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
@@ -284,6 +325,11 @@ function extrairMesAno(nomeArquivo: string, texto: string) {
   const mesNomeArquivo = parseMesAnoTexto(nomeArquivo);
   if (mesNomeArquivo?.mes && mesNomeArquivo.ano) {
     return mesNomeArquivo;
+  }
+
+  const mesNomeSemAno = parseMesNomeTexto(nomeArquivo);
+  if (mesNomeSemAno) {
+    return { mes: mesNomeSemAno, ano: new Date().getFullYear() };
   }
 
   const periodo = texto.match(/(\d{2})\/(\d{2})\/(\d{4})\s+a\s+\d{2}\/\d{2}\/\d{4}/i);
@@ -511,7 +557,7 @@ function compararLinhas(a: LinhaHonorario, b: LinhaHonorario) {
 
 export function parseLinhasHonorarios(texto: string, arquivo: string): LinhaHonorario[] {
   const { mes, ano } = extrairMesAno(arquivo, texto);
-  const intervaloFonte = extrairIntervaloFonte(texto);
+  const intervaloFonte = extrairIntervaloFonte(texto) || extrairCorteDiaNomeArquivo(arquivo, mes, ano);
 
   return texto
     .split(/\r?\n/)
@@ -629,16 +675,23 @@ export function montarRelatorio(linhas: LinhaHonorario[], arquivos: string[]): R
     const [ano, mesNumero] = key.split("-").map(Number);
     const bucket = porMes.get(key) || { qtd: 0, os: 0, hon: 0 };
     const fontes = fontesPorMes.get(key);
+    const intervalos = Array.from(fontes?.intervalos.values() || []).sort(
+      (a, b) => a.ano - b.ano || a.mesNumero - b.mesNumero || a.diaInicial - b.diaInicial || a.diaFinal - b.diaFinal
+    );
+    // Detecta PDF de relatorio anual: intervalo que cruza pelo menos 3 meses (ex. 01/01 a 31/12)
+    const ehRelatorioAnual = intervalos.some((iv) => iv.mesNumero !== iv.mesFinal && iv.mesFinal - iv.mesNumero >= 2);
+    const mesTitulo = nomesMeses[mesNumero] || String(mesNumero);
+    const label = ehRelatorioAnual
+      ? `Resumo anual ${ano}`
+      : `${mesTitulo} ${ano}`;
 
     return {
       ano,
       mesNumero,
-      mes: nomesMeses[mesNumero] || String(mesNumero),
-      label: `${nomesMeses[mesNumero] || String(mesNumero)} ${ano}`,
+      mes: mesTitulo,
+      label,
       arquivos: Array.from(fontes?.arquivos || []).sort((a, b) => a.localeCompare(b, "pt-BR")),
-      intervalos: Array.from(fontes?.intervalos.values() || []).sort(
-        (a, b) => a.ano - b.ano || a.mesNumero - b.mesNumero || a.diaInicial - b.diaInicial || a.diaFinal - b.diaFinal
-      ),
+      intervalos,
       linhas: fontes?.linhas || 0,
       quantidade: bucket.qtd,
       valorOs: bucket.os,

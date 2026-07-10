@@ -24,8 +24,8 @@ export type EtapaPNVALocal = {
 };
 
 export type EstrategiaPNVALocal = {
-  versao: "pnva-core-dados-locais-v1";
-  responsavel: "Gustavo Martins";
+  versao?: string;
+  responsavel?: string;
   confianca: number;
   diagnostico: string;
   proximaAcao: string;

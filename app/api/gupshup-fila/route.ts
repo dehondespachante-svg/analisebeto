@@ -1,5 +1,8 @@
 export const runtime = "nodejs";
 
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 type QueueStatus = "novo" | "em_atendimento" | "respondido" | "arquivado";
 
 type QueueItem = {
@@ -13,7 +16,9 @@ type QueueItem = {
   origem: "webhook" | "teste";
 };
 
+const FILA_PATH = path.join(process.cwd(), "data", "gupshup-fila.json");
 const fila: QueueItem[] = [];
+let filaCarregada = false;
 
 function agora() {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -29,6 +34,46 @@ function texto(valor: unknown) {
 
 function somenteNumeros(valor: unknown) {
   return texto(valor).replace(/\D/g, "");
+}
+
+function tokenWebhookRecebido(request: Request) {
+  return texto(request.headers.get("x-gupshup-token")) || texto(new URL(request.url).searchParams.get("token"));
+}
+
+function tokenWebhookEsperado() {
+  return texto(process.env.GUPSHUP_WEBHOOK_TOKEN);
+}
+
+function webhookAutenticado(request: Request) {
+  const esperado = tokenWebhookEsperado();
+  if (!esperado) return false;
+  return tokenWebhookRecebido(request) === esperado;
+}
+
+async function carregarFilaPersistida() {
+  if (filaCarregada) return;
+  filaCarregada = true;
+
+  const content = await readFile(FILA_PATH, "utf8").catch(() => "");
+  if (!content) return;
+
+  try {
+    const parsed = JSON.parse(content) as { fila?: QueueItem[] };
+    if (Array.isArray(parsed.fila)) {
+      fila.splice(0, fila.length, ...parsed.fila);
+    }
+  } catch {
+    // Se o cache persistido estiver corrompido, a fila volta vazia.
+  }
+}
+
+async function salvarFilaPersistida() {
+  await mkdir(path.dirname(FILA_PATH), { recursive: true });
+  await writeFile(
+    FILA_PATH,
+    JSON.stringify({ fila }, null, 2),
+    "utf8"
+  );
 }
 
 function extrairMensagem(body: Record<string, unknown>) {
@@ -59,6 +104,7 @@ function resumo() {
 }
 
 export async function GET() {
+  await carregarFilaPersistida();
   return Response.json(
     {
       resumo: resumo(),
@@ -69,11 +115,17 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  await carregarFilaPersistida();
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const dados = extrairMensagem(body || {});
+  const origem = texto(body?.origem) === "teste" ? "teste" : "webhook";
 
   if (!dados.telefone) {
     return Response.json({ ok: false, error: "Informe o telefone recebido." }, { status: 400 });
+  }
+
+  if (origem === "webhook" && !webhookAutenticado(request)) {
+    return Response.json({ ok: false, error: "Webhook nao autenticado." }, { status: 401 });
   }
 
   const item: QueueItem = {
@@ -84,14 +136,16 @@ export async function POST(request: Request) {
     status: "novo",
     recebidoEm: agora(),
     atualizadoEm: agora(),
-    origem: texto(body?.origem) === "teste" ? "teste" : "webhook",
+    origem,
   };
 
   fila.push(item);
+  await salvarFilaPersistida();
   return Response.json({ ok: true, item, resumo: resumo() }, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
+  await carregarFilaPersistida();
   const body = await request.json().catch(() => null) as { id?: string; status?: QueueStatus } | null;
   const statusPermitidos: QueueStatus[] = ["novo", "em_atendimento", "respondido", "arquivado"];
   const item = fila.find((entrada) => entrada.id === body?.id);
@@ -102,11 +156,14 @@ export async function PATCH(request: Request) {
 
   item.status = body.status;
   item.atualizadoEm = agora();
+  await salvarFilaPersistida();
 
   return Response.json({ ok: true, item, resumo: resumo() });
 }
 
 export async function DELETE() {
+  await carregarFilaPersistida();
   fila.length = 0;
+  await salvarFilaPersistida();
   return Response.json({ ok: true, resumo: resumo() });
 }

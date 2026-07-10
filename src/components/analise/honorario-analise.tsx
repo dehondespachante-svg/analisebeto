@@ -5,6 +5,7 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  ComposedChart,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -36,6 +37,7 @@ import {
   Layers,
   MapPin,
   Megaphone,
+  Menu,
   MessageCircle,
   Printer,
   Search,
@@ -47,15 +49,38 @@ import {
   TrendingUp,
   Users,
   Video,
+  Wifi,
+  X,
 } from "lucide-react";
-import { carregarRelatorioCache, limparRelatorioCache, salvarRelatorioCache } from "@/src/features/honorarios/client/cache";
+import SgdwModo from "@/src/components/analise/sgdw-tab";
+import {
+  carregarBaseAnualCache,
+  carregarRelatorioCache,
+  limparRelatorioCache,
+  salvarBaseAnualCache,
+  salvarRelatorioCache,
+  type BaseAnualCache,
+} from "@/src/features/honorarios/client/cache";
 import { analisarArquivosNoNavegador } from "@/src/features/honorarios/client/processar-arquivos";
 import { relatorioVazio, type RelatorioHonorarios, type ServicoDestaque } from "@/src/features/honorarios/modelo";
 import type { AnaliseDadosLocais, FiltroListaLocal } from "@/src/features/dados-locais/types";
 import styles from "@/src/styles/AnaliseHonorarios.module.css";
 
-type Aba = "resumo" | "comparacao" | "estrategia" | "anuncios" | "ganhos" | "servicos" | "metas" | "metaFuncionarios" | "auditoria";
-type ModoAnalise = "honorarios" | "dados-locais";
+type Aba =
+  | "resumo"
+  | "comparacao"
+  | "relatorio"
+  | "estrategia"
+  | "previsaoCampo"
+  | "metaAnual"
+  | "planosFinanceiros"
+  | "anuncios"
+  | "ganhos"
+  | "servicos"
+  | "metas"
+  | "metaFuncionarios"
+  | "auditoria";
+type ModoAnalise = "honorarios" | "dados-locais" | "sgdw";
 type CenarioId = "base" | "bull" | "bear" | "stress";
 type AbaLocal = "visao" | "cidades" | "estrategia" | "listas" | "qualidade";
 
@@ -258,6 +283,7 @@ type PeriodoImportado = NonNullable<RelatorioHonorarios["periodosImportados"]>[n
 type PeriodoServico = NonNullable<RelatorioHonorarios["servicosPorPeriodo"]>[number]["periodos"][number];
 
 type TipoRecorteTemporal = "todos" | "mes" | "semestre" | "trimestre";
+type ModoMetaCompetencia = "mes-anterior" | "mes-atual" | "proximo-mes";
 
 type RecorteTemporal = {
   key: string;
@@ -290,6 +316,7 @@ type PlanoCompetencia = {
   ano: number;
   mesNumero: number;
   label: string;
+  modo: ModoMetaCompetencia;
   emAndamento: boolean;
   diasCobertos: number;
   diasNoMes: number;
@@ -314,6 +341,117 @@ type PlanoCompetencia = {
   servicosFoco: Array<{ servico: string; honorarios: number }>;
 };
 
+type PrevisaoCampo = {
+  ano: number;
+  status: RadarStatus;
+  diagnostico: string;
+  decisao: string;
+  periodoBase: string;
+  padrao: string;
+  leituraPadrao: string;
+  confianca: number;
+  realizadoReconhecido: number;
+  realizadoAjustado: number;
+  metaAno: number;
+  previsaoAno: number;
+  conservador: number;
+  agressivo: number;
+  gapAno: number;
+  ritmoMensal: number;
+  ritmoDiarioNecessario: number;
+  mesesRestantes: number;
+  diasRestantes: number;
+  coberturaUltimo: number;
+  equacoes: Array<{ nome: string; formula: string; resultado: string; leitura: string; status: RadarStatus }>;
+  missoes: Array<{ etapa: string; titulo: string; missao: string; como: string; indicador: string; prazo: string; status: RadarStatus }>;
+  roteiro: Array<{ janela: string; missao: string; estatistica: string; execucao: string; status: RadarStatus }>;
+  servicos: Array<{
+    codigo: number;
+    servico: string;
+    atual: number;
+    tendencia: number | null;
+    previsaoAno: number;
+    acao: string;
+    status: RadarStatus;
+  }>;
+  grafico: Array<{ label: string; realizado: number; previsto: number; meta: number }>;
+};
+
+type OrganismoVivo = {
+  status: RadarStatus;
+  pulso: string;
+  comando: string;
+  diagnostico: string;
+  placar: Array<{ label: string; valor: string; detalhe: string; status: RadarStatus }>;
+  ciclo: Array<{ etapa: string; titulo: string; numero: string; missao: string; status: RadarStatus }>;
+  sinais: string[];
+};
+
+type PlanoFinanceiroProduto = {
+  codigo: number;
+  servico: string;
+  honorarios: number;
+  valorOs: number;
+  quantidade: number;
+  participacao: number;
+  margem: number;
+  ticket: number;
+  tendencia: number | null;
+  papel: string;
+  acao: string;
+  status: RadarStatus;
+};
+
+type PlanoFinanceiro = {
+  status: RadarStatus;
+  diagnostico: string;
+  comando: string;
+  caixaAtual: number;
+  caixaProjetado: number;
+  metaCaixa: number;
+  gapCaixa: number;
+  reservaMinima: number;
+  concentracaoTop3: number;
+  margemMedia: number;
+  ticketMedio: number;
+  produtos: PlanoFinanceiroProduto[];
+  arquitetura: Array<{ bloco: string; valor: string; detalhe: string; status: RadarStatus }>;
+  rotinas: Array<{ janela: string; rotina: string; numero: string; decisao: string; status: RadarStatus }>;
+  grafico: Array<{ produto: string; caixa: number; margem: number; participacao: number }>;
+};
+
+type MetaAnualServico = {
+  codigo: number;
+  servico: string;
+  meta: number;
+  realizado: number;
+  percentual: number;
+  projecao: number;
+  progresso: number;
+  status: RadarStatus;
+  statusLabel: string;
+};
+
+type MetaAnual = {
+  ano: number;
+  status: RadarStatus;
+  titulo: string;
+  subtitulo: string;
+  baseLabel: string;
+  origemBase: string;
+  metaAno: number;
+  realizado: number;
+  falta: number;
+  projecao: number;
+  ritmoNecessarioMes: number;
+  percentualAno: number;
+  mesesRealizados: number;
+  mesesRestantes: number;
+  mensagem: string;
+  servicos: MetaAnualServico[];
+  grafico: Array<{ mes: string; metaAcumulada: number; realizadoAcumulado: number | null }>;
+};
+
 type ComparacaoTrimestral = {
   grupos: GrupoTrimestral[];
   anterior: GrupoTrimestral;
@@ -325,7 +463,11 @@ type ComparacaoTrimestral = {
 const abas: Array<{ id: Aba; label: string; icon: React.ReactNode }> = [
   { id: "comparacao", label: "Comparacao", icon: <ArrowLeftRight size={18} /> },
   { id: "resumo", label: "Resumo", icon: <BarChart3 size={18} /> },
+  { id: "relatorio", label: "Mes a mes", icon: <CalendarDays size={18} /> },
   { id: "estrategia", label: "Estrategia", icon: <Activity size={18} /> },
+  { id: "previsaoCampo", label: "Previsao de campo", icon: <MapPin size={18} /> },
+  { id: "metaAnual", label: "Meta anual", icon: <Target size={18} /> },
+  { id: "planosFinanceiros", label: "Planos financeiros", icon: <Gauge size={18} /> },
   { id: "anuncios", label: "Anuncios", icon: <Megaphone size={18} /> },
   { id: "ganhos", label: "Ganhos", icon: <LineChartIcon size={18} /> },
   { id: "servicos", label: "Servicos", icon: <ClipboardList size={18} /> },
@@ -366,6 +508,11 @@ function pct(novo: number, antigo: number) {
   return (novo - antigo) / antigo;
 }
 
+const NOMES_MESES_LOCAL: Record<number, string> = {
+  1: "Janeiro", 2: "Fevereiro", 3: "Marco", 4: "Abril", 5: "Maio", 6: "Junho",
+  7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
+};
+
 function pegarIndicador(resumo: RelatorioHonorarios["resumo"], indicador: string) {
   return resumo.find((item) => item.indicador === indicador);
 }
@@ -390,6 +537,26 @@ function desvioPadrao(valores: number[]) {
   return Math.sqrt(variancia);
 }
 
+function limitarNumero(valor: number, minimo: number, maximo: number) {
+  return Math.max(minimo, Math.min(maximo, valor));
+}
+
+function calcularTendenciaLinear(valores: number[]) {
+  const validos = valores.filter((valor) => Number.isFinite(valor));
+  if (validos.length < 2) return { inclinacao: 0, intercepto: validos[0] || 0 };
+
+  const mediaX = (validos.length - 1) / 2;
+  const mediaY = media(validos);
+  const numerador = validos.reduce((total, valor, index) => total + (index - mediaX) * (valor - mediaY), 0);
+  const denominador = validos.reduce((total, _valor, index) => total + (index - mediaX) ** 2, 0) || 1;
+  const inclinacao = numerador / denominador;
+
+  return {
+    inclinacao,
+    intercepto: mediaY - inclinacao * mediaX,
+  };
+}
+
 function calcularMaxDrawdown(valores: number[]) {
   let topo = valores[0] || 0;
   let piorQueda = 0;
@@ -402,6 +569,23 @@ function calcularMaxDrawdown(valores: number[]) {
   });
 
   return piorQueda;
+}
+
+function mediaPonderadaCampo(valores: number[]) {
+  const validos = valores.filter((valor) => Number.isFinite(valor) && valor > 0).slice(-3);
+  if (!validos.length) return 0;
+  const pesos = validos.length === 3 ? [0.2, 0.3, 0.5] : validos.length === 2 ? [0.4, 0.6] : [1];
+  const somaPesos = pesos.slice(0, validos.length).reduce((total, peso) => total + peso, 0) || 1;
+  return validos.reduce((total, valor, index) => total + valor * pesos[index], 0) / somaPesos;
+}
+
+function diasRestantesDoAno(ano: number, mesNumero: number, diaReferencia: number) {
+  const ultimoDiaMes = diasNoMes(ano, mesNumero);
+  const inicio = new Date(ano, mesNumero - 1, Math.min(diaReferencia + 1, ultimoDiaMes + 1));
+  const fim = new Date(ano, 11, 31);
+
+  if (inicio > fim) return 0;
+  return Math.floor((fim.getTime() - inicio.getTime()) / 86400000) + 1;
 }
 
 function juntarLista(itens: string[]) {
@@ -575,22 +759,33 @@ function formatarDataMarketing(data: Date) {
 }
 
 function montarMarketingInteligente(relatorio: RelatorioHonorarios, planoCompetencia: PlanoCompetencia | null): MarketingInteligente {
-  const servicosBase = relatorio.servicos.filter((servico) => servico.honorarios2026 || servico.qtd2026);
-  const totalHonorarios = servicosBase.reduce((total, servico) => total + servico.honorarios2026, 0) || 1;
-  const totalQuantidade = servicosBase.reduce((total, servico) => total + servico.qtd2026, 0) || 1;
+  const servicosBase = relatorio.servicos.filter((servico) => servico.honorarios2026 > 0 || servico.honorarios2025 > 0);
+  const honorariosAtual = (s: RelatorioHonorarios["servicos"][number]) => s.honorarios2026 || s.honorarios2025;
+  const qtdAtual = (s: RelatorioHonorarios["servicos"][number]) => s.qtd2026 || s.qtd2025;
+  const totalHonorarios = servicosBase.reduce((total, servico) => total + honorariosAtual(servico), 0) || 1;
+  const totalQuantidade = servicosBase.reduce((total, servico) => total + qtdAtual(servico), 0) || 1;
   const mediaHonorario = totalHonorarios / totalQuantidade;
   const competenciaVenda = planoCompetencia?.label || relatorio.comparacao?.atualLabel || "proximo ciclo";
+
+  const canais = [
+    { canal: "WhatsApp", horario: "09:10", tipo: "Lembrete de prazo" },
+    { canal: "Stories", horario: "11:30", tipo: "Dor rapida" },
+    { canal: "Reels", horario: "15:40", tipo: "Roteiro curto" },
+    { canal: "WhatsApp", horario: "17:20", tipo: "Fechamento leve" },
+    { canal: "Feed", horario: "19:10", tipo: "Prova simples" },
+  ];
 
   const planos = servicosBase
     .map((servico, index) => {
       const perfil = perfilComercialServico(servico.servico);
-      const participacaoHonorarios = servico.honorarios2026 / totalHonorarios;
-      const participacaoQuantidade = servico.qtd2026 / totalQuantidade;
+      const participacaoHonorarios = honorariosAtual(servico) / totalHonorarios;
+      const participacaoQuantidade = qtdAtual(servico) / totalQuantidade;
       const crescimento = servico.crescimento;
       const crescimentoScore =
         crescimento === null ? 10 : crescimento >= 0 ? Math.min(22, crescimento * 55) : Math.min(24, Math.abs(crescimento) * 60);
       const quedaScore = crescimento !== null && crescimento < -0.08 ? 16 : 0;
-      const mediaScore = servico.honorarioMedio2026 >= mediaHonorario ? 10 : 4;
+      const honorarioMedioAtual = qtdAtual(servico) ? honorariosAtual(servico) / qtdAtual(servico) : servico.honorarioMedio2026;
+      const mediaScore = honorarioMedioAtual >= mediaHonorario ? 10 : 4;
       const score = limitarScore(32 + participacaoHonorarios * 35 + participacaoQuantidade * 18 + crescimentoScore + quedaScore + mediaScore);
       const anuncios = Math.max(4, Math.min(14, Math.round(4 + score / 12 + participacaoHonorarios * 9 + quedaScore / 8)));
       const status: RadarStatus =
@@ -620,7 +815,11 @@ function montarMarketingInteligente(relatorio: RelatorioHonorarios, planoCompete
         score,
         anuncios,
         melhorCanal: perfil.canal,
-        horarios: "09:10, 15:40 e 17:20",
+        horarios: (() => {
+          const match = canais.filter((c) => perfil.canal.toLowerCase().includes(c.canal.toLowerCase()));
+          const lista = (match.length > 0 ? match.slice(0, 3) : [canais[0], canais[3]]).map((c) => c.horario);
+          return lista.length <= 1 ? lista[0] : lista.slice(0, -1).join(", ") + " e " + lista[lista.length - 1];
+        })(),
         motivacao,
         roteiro: montarRoteiroAnuncio(perfil),
         whatsapp: montarFrasesWhatsapp(perfil),
@@ -632,13 +831,6 @@ function montarMarketingInteligente(relatorio: RelatorioHonorarios, planoCompete
 
   const totalAnuncios = planos.reduce((total, plano) => total + plano.anuncios, 0);
   const datas = datasPadraoMarketing(Math.min(Math.max(totalAnuncios, planos.length * 2), 32));
-  const canais = [
-    { canal: "WhatsApp", horario: "09:10", tipo: "Lembrete de prazo" },
-    { canal: "Stories", horario: "11:30", tipo: "Dor rapida" },
-    { canal: "Reels", horario: "15:40", tipo: "Roteiro curto" },
-    { canal: "WhatsApp", horario: "17:20", tipo: "Fechamento leve" },
-    { canal: "Feed", horario: "19:10", tipo: "Prova simples" },
-  ];
   const motivos = [
     "Abrir conversa sem pressionar.",
     "Mostrar prazo, risco e facilidade.",
@@ -754,11 +946,30 @@ function proximaCompetencia(ano: number, mesNumero: number) {
   return mesNumero === 12 ? { ano: ano + 1, mesNumero: 1 } : { ano, mesNumero: mesNumero + 1 };
 }
 
-function coberturaDoPeriodo(periodo: PeriodoImportado) {
-  if (periodoTemCoberturaComparavel(periodo)) {
-    return { diasCobertos: diasNoMes(periodo.ano, periodo.mesNumero), cobertura: 1 };
-  }
+function competenciaAnterior(ano: number, mesNumero: number) {
+  return mesNumero === 1 ? { ano: ano - 1, mesNumero: 12 } : { ano, mesNumero: mesNumero - 1 };
+}
 
+function compararCompetencias(
+  a: { ano: number; mesNumero: number },
+  b: { ano: number; mesNumero: number }
+) {
+  return a.ano - b.ano || a.mesNumero - b.mesNumero;
+}
+
+function competenciaCalendarioAtual() {
+  const hoje = new Date();
+  return { ano: hoje.getFullYear(), mesNumero: hoje.getMonth() + 1 };
+}
+
+function competenciaPorModo(modo: ModoMetaCompetencia) {
+  const atual = competenciaCalendarioAtual();
+  if (modo === "mes-anterior") return competenciaAnterior(atual.ano, atual.mesNumero);
+  if (modo === "proximo-mes") return proximaCompetencia(atual.ano, atual.mesNumero);
+  return atual;
+}
+
+function coberturaCalendarioDoPeriodo(periodo: PeriodoImportado) {
   const intervalosValidos = (periodo.intervalos || []).filter(
     (intervalo) =>
       intervalo.ano === periodo.ano &&
@@ -770,14 +981,50 @@ function coberturaDoPeriodo(periodo: PeriodoImportado) {
   const totalDias = diasNoMes(periodo.ano, periodo.mesNumero);
   return {
     diasCobertos: diaFinal,
-    cobertura: diaFinal ? Math.min(1, diaFinal / totalDias) : 0,
+    cobertura: diaFinal ? Math.min(1, diaFinal / totalDias) : 1,
   };
+}
+
+function coberturaDoPeriodo(periodo: PeriodoImportado) {
+  if (periodoTemCoberturaComparavel(periodo)) {
+    return { diasCobertos: diasNoMes(periodo.ano, periodo.mesNumero), cobertura: 1 };
+  }
+
+  return coberturaCalendarioDoPeriodo(periodo);
 }
 
 function mediaPonderadaRecente(periodos: PeriodoImportado[]) {
   const recentes = ordenarPeriodos(periodos).slice(-3);
   const pesos = recentes.length === 3 ? [0.2, 0.3, 0.5] : recentes.length === 2 ? [0.4, 0.6] : [1];
   return recentes.reduce((total, periodo, index) => total + periodo.honorarios * pesos[index], 0);
+}
+
+function projetarCompetenciaSemDados(periodosBase: PeriodoImportado[], fallback: number, mesesAFrente = 1) {
+  const valores = ordenarPeriodos(periodosBase)
+    .map((periodo) => periodo.honorarios)
+    .filter((valor) => Number.isFinite(valor) && valor > 0);
+
+  if (valores.length < 2) return fallback;
+
+  const base = valores.at(-1) || fallback;
+  const mediaRecente = mediaPonderadaCampo(valores) || base;
+  const crescimentos = valores
+    .map((valor, index) => (index ? pct(valor, valores[index - 1]) : null))
+    .filter((valor): valor is number => valor !== null && Number.isFinite(valor));
+  const momentum = crescimentos.length ? media(crescimentos.slice(-3)) : 0;
+  const volatilidade = desvioPadrao(crescimentos);
+  const momentumComFreio = limitarNumero(momentum * limitarNumero(1 - volatilidade * 1.8, 0.25, 0.75), -0.12, 0.18);
+  const previsao = mediaRecente * (1 + momentumComFreio);
+
+  if (mesesAFrente <= 1) {
+    return limitarNumero(previsao, base * 0.78, base * 1.32);
+  }
+
+  // Compound growth for months further ahead — each additional month uses 75% of the momentum
+  // to avoid runaway projections as uncertainty grows with distance
+  const taxaAdicional = momentumComFreio * 0.75;
+  const previsaoComposta = previsao * Math.pow(1 + taxaAdicional, mesesAFrente - 1);
+  return limitarNumero(previsaoComposta, base * 0.65, base * 1.58);
 }
 
 function somarPeriodos(periodos: Array<{ quantidade: number; valorOs: number; honorarios: number }>) {
@@ -791,24 +1038,45 @@ function somarPeriodos(periodos: Array<{ quantidade: number; valorOs: number; ho
   );
 }
 
-function montarPlanoCompetencia(relatorio: RelatorioHonorarios | null): PlanoCompetencia | null {
+function montarPlanoCompetencia(
+  relatorio: RelatorioHonorarios | null,
+  modo: ModoMetaCompetencia = "proximo-mes"
+): PlanoCompetencia | null {
   if (!relatorio) return null;
   const periodos = periodosImportadosDoRelatorio(relatorio);
   const ultimo = periodos.at(-1);
   if (!ultimo) return null;
 
-  const ultimoCompleto = periodoTemCoberturaComparavel(ultimo);
-  const competencia = ultimoCompleto ? proximaCompetencia(ultimo.ano, ultimo.mesNumero) : ultimo;
+  const competenciaCalendario = competenciaPorModo(modo);
+  const existeCompetenciaCalendario = periodos.some(
+    (periodo) => periodo.ano === competenciaCalendario.ano && periodo.mesNumero === competenciaCalendario.mesNumero
+  );
+  const competencia =
+    existeCompetenciaCalendario ||
+    modo === "mes-anterior" ||
+    (modo === "mes-atual" && compararCompetencias(ultimo, competenciaCalendario) <= 0) ||
+    (modo === "proximo-mes" && compararCompetencias(ultimo, competenciaCalendario) <= 0)
+      ? competenciaCalendario
+      : modo === "proximo-mes"
+        ? proximaCompetencia(ultimo.ano, ultimo.mesNumero)
+        : ultimo;
   const chaveCompetencia = `${competencia.ano}-${competencia.mesNumero}`;
   const periodoCompetencia = periodos.find((periodo) => chavePeriodo(periodo) === chaveCompetencia);
-  const fechadosAntes = periodos.filter(
+  const periodosAntes = periodos.filter(
     (periodo) =>
-      periodoTemCoberturaComparavel(periodo) &&
       (periodo.ano < competencia.ano || (periodo.ano === competencia.ano && periodo.mesNumero < competencia.mesNumero))
   );
+  const fechadosAntes = periodosAntes.filter(periodoTemCoberturaComparavel);
   const fechadosDoAno = fechadosAntes.filter((periodo) => periodo.ano === competencia.ano);
   const recentes = (fechadosDoAno.length ? fechadosDoAno : fechadosAntes).slice(-3);
-  if (!recentes.length) return null;
+  const periodoBaseAnterior = periodosAntes.at(-1) || null;
+  if (!periodoBaseAnterior && !recentes.length) return null;
+
+  // How many months ahead of the last closed period is the target competencia
+  const ultimoFechado = fechadosAntes.at(-1) || periodoBaseAnterior;
+  const mesesAFrente = ultimoFechado
+    ? Math.max(1, (competencia.ano - ultimoFechado.ano) * 12 + (competencia.mesNumero - ultimoFechado.mesNumero))
+    : 1;
 
   const sazonal = periodos.find(
     (periodo) =>
@@ -818,43 +1086,59 @@ function montarPlanoCompetencia(relatorio: RelatorioHonorarios | null): PlanoCom
   );
   const baseRecente = mediaPonderadaRecente(recentes);
   const baseSazonal = sazonal?.honorarios || 0;
-  const baseMeta = baseSazonal ? baseSazonal * 0.6 + baseRecente * 0.4 : baseRecente;
+  const baseMeta = periodoBaseAnterior?.honorarios || baseSazonal || baseRecente;
   const metaCrescimento = relatorio.comparacao?.metaCrescimento || 0.3;
-  const meta = baseMeta * (1 + metaCrescimento);
+  // Meta compounds modestly per extra month ahead (half-rate for each step beyond the first)
+  const meta = baseMeta * (1 + metaCrescimento) * (mesesAFrente > 1 ? Math.pow(1 + metaCrescimento * 0.45, mesesAFrente - 1) : 1);
   const realizado = periodoCompetencia?.honorarios || 0;
   const cobertura = periodoCompetencia
-    ? coberturaDoPeriodo(periodoCompetencia)
+    ? modo === "mes-atual"
+      ? coberturaCalendarioDoPeriodo(periodoCompetencia)
+      : coberturaDoPeriodo(periodoCompetencia)
     : { diasCobertos: 0, cobertura: 0 };
   const emAndamento = Boolean(periodoCompetencia && cobertura.cobertura < 1);
-  const projecaoBruta = emAndamento && cobertura.cobertura > 0 ? realizado / cobertura.cobertura : realizado || baseRecente;
+  const projecaoSemDados = projetarCompetenciaSemDados(fechadosAntes, baseMeta, mesesAFrente);
+  const projecaoBruta = emAndamento && cobertura.cobertura > 0 ? realizado / cobertura.cobertura : realizado || projecaoSemDados;
   const projecao = emAndamento ? Math.min(projecaoBruta, Math.max(baseMeta * 2.5, realizado)) : projecaoBruta;
   const progresso = meta ? Math.min(100, (realizado / meta) * 100) : 0;
   const progressoProjetado = meta ? Math.min(100, (projecao / meta) * 100) : 0;
   const atingiuMeta = realizado >= meta;
+  const semDados = !realizado && !emAndamento;
   const status: RadarStatus = atingiuMeta
     ? "bom"
-    : emAndamento && projecao >= meta
+    : semDados && projecao >= meta
       ? "bom"
-      : emAndamento && projecao >= meta * 0.85
+      : semDados && projecao >= meta * 0.85
         ? "alerta"
-        : emAndamento
-          ? "critico"
-          : "alerta";
+        : emAndamento && projecao >= meta
+          ? "bom"
+          : emAndamento && projecao >= meta * 0.85
+            ? "alerta"
+            : emAndamento
+              ? "critico"
+              : "alerta";
   const statusLabel = atingiuMeta
     ? "Meta atingida"
-    : emAndamento && projecao >= meta
-      ? "No ritmo da meta"
-      : emAndamento && projecao >= meta * 0.85
-        ? "Ritmo exige atencao"
-        : emAndamento
-          ? "Abaixo do ritmo"
-          : "Meta preparada";
-  const chavesRecentes = new Set(recentes.map(chavePeriodo));
+    : semDados && projecao >= meta
+      ? `Previsao favoravel (+${Math.round(mesesAFrente)} mes${mesesAFrente > 1 ? "es" : ""} a frente)`
+      : semDados && projecao >= meta * 0.85
+        ? `Meta alcancavel (projecao ${mesesAFrente} mes${mesesAFrente > 1 ? "es" : ""} a frente)`
+        : semDados
+          ? `Meta preparada (${mesesAFrente} mes${mesesAFrente > 1 ? "es" : ""} sem dados)`
+          : emAndamento && projecao >= meta
+            ? "No ritmo da meta"
+            : emAndamento && projecao >= meta * 0.85
+              ? "Ritmo exige atencao"
+              : emAndamento
+                ? "Abaixo do ritmo"
+                : "Meta preparada";
+  const periodosBase = periodoBaseAnterior ? [periodoBaseAnterior] : sazonal ? [sazonal] : recentes;
+  const chavesBase = new Set(periodosBase.map(chavePeriodo));
   const servicosFoco = (relatorio.servicosPorPeriodo || [])
     .map((servico) => ({
       servico: servico.servico,
       honorarios: servico.periodos
-        .filter((periodo) => chavesRecentes.has(chavePeriodo(periodo)))
+        .filter((periodo) => chavesBase.has(chavePeriodo(periodo)))
         .reduce((total, periodo) => total + periodo.honorarios, 0),
     }))
     .filter((servico) => servico.honorarios > 0)
@@ -865,6 +1149,7 @@ function montarPlanoCompetencia(relatorio: RelatorioHonorarios | null): PlanoCom
     ano: competencia.ano,
     mesNumero: competencia.mesNumero,
     label: periodoCompetencia?.label || `${nomeMes(competencia.mesNumero)} ${competencia.ano}`,
+    modo,
     emAndamento,
     diasCobertos: cobertura.diasCobertos,
     diasNoMes: diasNoMes(competencia.ano, competencia.mesNumero),
@@ -873,10 +1158,14 @@ function montarPlanoCompetencia(relatorio: RelatorioHonorarios | null): PlanoCom
     baseRecente,
     baseSazonal,
     baseMeta,
-    origemMeta: sazonal
-      ? `60% ${sazonal.label} + 40% media ponderada recente`
-      : `Media ponderada dos ${recentes.length} ultimos meses fechados`,
-    periodosBase: recentes.map((periodo) => periodo.label),
+    origemMeta: periodoBaseAnterior
+      ? mesesAFrente > 1
+        ? `Projecao ${mesesAFrente} meses a frente de ${periodoBaseAnterior.label}`
+        : `Base: ${periodoBaseAnterior.label}`
+      : sazonal
+        ? `Mesmo mes do ano anterior: ${sazonal.label}`
+        : `Media ponderada dos ${recentes.length} ultimos meses fechados`,
+    periodosBase: periodosBase.map((periodo) => periodo.label),
     meta,
     realizado,
     projecao,
@@ -905,6 +1194,23 @@ function periodosImportadosDoRelatorio(relatorio: RelatorioHonorarios): PeriodoI
       ...periodo,
     }))
   );
+}
+
+function sugerirModoMetaCompetencia(relatorio: RelatorioHonorarios | null): ModoMetaCompetencia {
+  if (!relatorio) return "mes-atual";
+
+  const ultimo = periodosImportadosDoRelatorio(relatorio).at(-1);
+  if (!ultimo) return "mes-atual";
+
+  const cobertura = coberturaCalendarioDoPeriodo(ultimo);
+  const atual = competenciaCalendarioAtual();
+  if (compararCompetencias(ultimo, atual) < 0) return "mes-atual";
+
+  if (ultimo.ano === atual.ano && ultimo.mesNumero === atual.mesNumero && cobertura.cobertura > 0 && cobertura.cobertura < 1) {
+    return "mes-atual";
+  }
+
+  return "proximo-mes";
 }
 
 function periodoServicoZerado(periodo: PeriodoImportado): PeriodoServico {
@@ -1038,6 +1344,9 @@ function montarResumoPeriodos(periodos: PeriodoImportado[]): RelatorioHonorarios
   const honorarioMedio = total.quantidade ? total.honorarios / total.quantidade : 0;
   const ticketMedio = total.quantidade ? total.valorOs / total.quantidade : 0;
 
+  // valor2025 = 0 porque recorte nao tem periodo anterior para comparacao direta.
+  // Para comparacao mes-a-mes, comparacaoMensal=true usa primeiroPeriodo diretamente.
+  // Para periodo unico, a UI suprime o zero com "Periodo unico selecionado".
   return [
     { indicador: "Quantidade total", valor2025: 0, valor2026: total.quantidade, variacao: 0, tipo: "numero" },
     { indicador: "Valor O.S. total", valor2025: 0, valor2026: total.valorOs, variacao: 0, tipo: "moeda" },
@@ -1454,6 +1763,20 @@ function CustomTooltip({
         </span>
       ))}
     </div>
+  );
+}
+
+function ChartShell({
+  height,
+  children,
+}: {
+  height: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <ResponsiveContainer width="100%" height={height} debounce={100}>
+      {children}
+    </ResponsiveContainer>
   );
 }
 
@@ -2060,9 +2383,11 @@ function DadosLocaisConteudo({
 export default function AnaliseHonorariosPage() {
   const [modoAnalise, setModoAnalise] = useState<ModoAnalise>("honorarios");
   const [abaAtiva, setAbaAtiva] = useState<Aba>("comparacao");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const loteInputRef = useRef<HTMLInputElement | null>(null);
   const [relatorioUpload, setRelatorioUpload] = useState<RelatorioHonorarios | null>(null);
+  const [baseAnualLocal, setBaseAnualLocal] = useState<BaseAnualCache | null>(null);
   const [processando, setProcessando] = useState(false);
   const [statusUpload, setStatusUpload] = useState("");
   const [erroUpload, setErroUpload] = useState("");
@@ -2078,6 +2403,7 @@ export default function AnaliseHonorariosPage() {
   const [filtroDadosLocais, setFiltroDadosLocais] = useState<FiltroListaLocal>("todas");
   const [fraseCopiada, setFraseCopiada] = useState("");
   const [quantidadeFuncionarios, setQuantidadeFuncionarios] = useState(1);
+  const [modoMetaCompetencia, setModoMetaCompetencia] = useState<ModoMetaCompetencia>("mes-atual");
 
   const servicosFiltro = useMemo(
     () =>
@@ -2109,14 +2435,13 @@ export default function AnaliseHonorariosPage() {
     );
   }, [servicosFiltro, termoBuscaServico]);
   const servicosFiltroVisiveis = useMemo(() => {
-    const candidatos = termoBuscaServico ? servicosFiltroEncontrados : servicosFiltro.slice(0, 12);
     const unicos = new Map<string, (typeof servicosFiltro)[number]>();
 
     servicosFiltrados.forEach((servico) => unicos.set(chaveServico(servico), servico));
-    candidatos.forEach((servico) => unicos.set(chaveServico(servico), servico));
+    servicosFiltroEncontrados.forEach((servico) => unicos.set(chaveServico(servico), servico));
 
-    return Array.from(unicos.values()).slice(0, termoBuscaServico ? 40 : 18);
-  }, [servicosFiltrados, servicosFiltro, servicosFiltroEncontrados, termoBuscaServico]);
+    return Array.from(unicos.values());
+  }, [servicosFiltrados, servicosFiltroEncontrados]);
   const dadosServico = useMemo(
     () => (relatorioUpload ? montarRelatorioServicos(relatorioUpload, servicosSelecionadosAtivos) : relatorioVazio),
     [relatorioUpload, servicosSelecionadosAtivos]
@@ -2154,7 +2479,58 @@ export default function AnaliseHonorariosPage() {
     [dadosServico, recorteTemporalAtivo]
   );
   const comparacaoTrimestral = useMemo(() => montarComparacaoTrimestral(dadosAtuais), [dadosAtuais]);
-  const planoCompetencia = useMemo(() => (relatorioUpload ? montarPlanoCompetencia(dadosServico) : null), [dadosServico, relatorioUpload]);
+  const opcoesModoMeta = useMemo(() => {
+    const periodos = periodosImportadosDoRelatorio(dadosServico);
+    if (!periodos.length) return [];
+
+    const atual = competenciaCalendarioAtual();
+    const anteriorCalendario = competenciaAnterior(atual.ano, atual.mesNumero);
+    const proximo = proximaCompetencia(atual.ano, atual.mesNumero);
+    const periodoAnterior = periodos.find(
+      (periodo) => periodo.ano === anteriorCalendario.ano && periodo.mesNumero === anteriorCalendario.mesNumero
+    );
+    const periodoAtual = periodos.find((periodo) => periodo.ano === atual.ano && periodo.mesNumero === atual.mesNumero);
+    const ultimoAntesDoAtual = periodos
+      .filter((periodo) => periodo.ano < atual.ano || (periodo.ano === atual.ano && periodo.mesNumero < atual.mesNumero))
+      .at(-1);
+
+    return [
+      {
+        id: "mes-anterior" as const,
+        label: `Mes anterior: ${periodoAnterior?.label || `${nomeMes(anteriorCalendario.mesNumero)} ${anteriorCalendario.ano}`}`,
+        detalhe: periodoAnterior
+          ? "Usa a competencia anterior fechada como alvo da meta."
+          : "Aguardando arquivo dessa competencia.",
+      },
+      {
+        id: "mes-atual" as const,
+        label: `Este mes: ${periodoAtual?.label || `${nomeMes(atual.mesNumero)} ${atual.ano}`}`,
+        detalhe: ultimoAntesDoAtual
+          ? `Compara com ${ultimoAntesDoAtual.label} e acompanha o mes em andamento.`
+          : "Mantem a meta na competencia atual do calendario.",
+      },
+      {
+        id: "proximo-mes" as const,
+        label: `Proximo mes: ${nomeMes(proximo.mesNumero)} ${proximo.ano}`,
+        detalhe: `Prepara a proxima competencia usando a melhor base fechada disponivel.`,
+      },
+    ];
+  }, [dadosServico]);
+  const planoCompetencia = useMemo(
+    () => (relatorioUpload ? montarPlanoCompetencia(dadosServico, modoMetaCompetencia) : null),
+    [dadosServico, modoMetaCompetencia, relatorioUpload]
+  );
+  const competenciaMetaFechada = Boolean(
+    planoCompetencia?.modo === "mes-anterior" && planoCompetencia.realizado > 0 && !planoCompetencia.emAndamento
+  );
+  const competenciaMetaSemDados = Boolean(planoCompetencia && !planoCompetencia.realizado && !planoCompetencia.emAndamento);
+  const gapOperacionalCompetencia = planoCompetencia
+    ? competenciaMetaFechada
+      ? 0
+      : competenciaMetaSemDados
+        ? planoCompetencia.gapProjetado
+        : planoCompetencia.gap
+    : 0;
   const valorOsDisponivel = dadosAtuais.camposDisponiveis?.valorOs !== false;
   const marketingInteligente = useMemo(
     () => montarMarketingInteligente(dadosAtuais, planoCompetencia),
@@ -2163,10 +2539,15 @@ export default function AnaliseHonorariosPage() {
 
   useEffect(() => {
     const relatorioCache = carregarRelatorioCache();
-    if (!relatorioCache) return;
-
     const restoreTimer = window.setTimeout(() => {
+      if (!relatorioCache) {
+        setBaseAnualLocal(carregarBaseAnualCache());
+        return;
+      }
       setRelatorioUpload(relatorioCache);
+      setModoMetaCompetencia(sugerirModoMetaCompetencia(relatorioCache));
+      salvarBaseAnualCache(relatorioCache);
+      setBaseAnualLocal(carregarBaseAnualCache());
       setStatusUpload(`Analise restaurada do cache local: ${relatorioCache.totalLinhas || 0} linhas.`);
     }, 0);
 
@@ -2221,6 +2602,7 @@ export default function AnaliseHonorariosPage() {
   }, [escopoImpressao]);
 
   const periodosAnalisados = useMemo(() => dadosAtuais.periodos || [], [dadosAtuais.periodos]);
+
   const periodosImportados = useMemo<NonNullable<RelatorioHonorarios["periodosImportados"]>>(
     () =>
       dadosAtuais.periodosImportados?.length
@@ -2234,6 +2616,89 @@ export default function AnaliseHonorariosPage() {
           })),
     [dadosAtuais.anos.atual, dadosAtuais.periodosImportados, periodosAnalisados]
   );
+
+  const base2025Info = useMemo(() => {
+    const anoAtual = dadosAtuais.anos.atual;
+    const periodosAnteriores = periodosImportados.filter((p) => p.ano < anoAtual);
+    if (periodosAnteriores.length > 0) {
+      const porAno = new Map<number, typeof periodosAnteriores>();
+      for (const p of periodosAnteriores) {
+        const list = porAno.get(p.ano) || [];
+        list.push(p);
+        porAno.set(p.ano, list);
+      }
+      const anoBase = Math.max(...Array.from(porAno.keys()));
+      const periodosBase = porAno.get(anoBase) || [];
+      const total = periodosBase.reduce((s, p) => s + p.honorarios, 0);
+      const isAnualTotal =
+        periodosBase.length === 1 &&
+        (periodosBase[0].intervalos ?? []).some((iv) => iv.mesNumero !== iv.mesFinal);
+      const mediaMensal = isAnualTotal ? total / 12 : total / Math.max(periodosBase.length, 1);
+      return { total, mediaMensal, ano: anoBase, mesesNaBase: periodosBase.length, isAnualTotal, fonte: "importado" as const };
+    }
+    if (baseAnualLocal?.periodos.length) {
+      const anoBase = anoAtual - 1;
+      const pAnt = baseAnualLocal.periodos.filter((p) => p.ano === anoBase);
+      if (pAnt.length > 0) {
+        const total = pAnt.reduce((s, p) => s + p.honorarios, 0);
+        const mediaMensal = pAnt.length < 12 ? total / 12 : total / pAnt.length;
+        return { total, mediaMensal, ano: anoBase, mesesNaBase: pAnt.length, isAnualTotal: pAnt.length < 12, fonte: "cache" as const };
+      }
+    }
+    return null;
+  }, [dadosAtuais.anos.atual, periodosImportados, baseAnualLocal]);
+
+  const previsaoAnualMeses = useMemo(() => {
+    const hoje = new Date();
+    const anoCalendario = hoje.getFullYear();
+    const mesCalendario = hoje.getMonth() + 1;
+
+    // Always target the CURRENT calendar year, regardless of what year the parser found
+    const anoAlvo = Math.max(dadosAtuais.anos.atual, anoCalendario);
+
+    // Actual months we have for the target year
+    const periodosAnoAtual = ordenarPeriodos(periodosImportados.filter((p) => p.ano === anoAlvo));
+    const ultimoMesReal = periodosAnoAtual.length > 0 ? periodosAnoAtual.at(-1)!.mesNumero : 0;
+
+    // Start forecast from: month after last data, or current calendar month if no data yet
+    const mesInicio = ultimoMesReal > 0 ? ultimoMesReal + 1 : mesCalendario;
+    if (mesInicio > 12) return [];
+
+    const temTendencia = periodosAnoAtual.length >= 2;
+    const fallback = base2025Info?.mediaMensal ?? (periodosAnoAtual.at(-1)?.honorarios ?? 0);
+    if (!fallback) return [];
+
+    const resultado: Array<{
+      mes: string; label: string; honorarios: number; meta30: number;
+      crescimentoHonorarios: number | null; atingiuMeta: boolean;
+      quantidade: number; mesNumero: number; ano: number;
+      previsao: true; confianca: number;
+    }> = [];
+    let honorarioAnterior = periodosAnoAtual.at(-1)?.honorarios ?? fallback;
+
+    for (let mesAlvo = mesInicio; mesAlvo <= 12; mesAlvo++) {
+      const mesesAFrente = Math.max(1, mesAlvo - ultimoMesReal);
+      const valorPrevisto = temTendencia
+        ? projetarCompetenciaSemDados(periodosAnoAtual, fallback, mesesAFrente)
+        : fallback;
+      const crescimento = honorarioAnterior > 0 ? (valorPrevisto - honorarioAnterior) / honorarioAnterior : null;
+      resultado.push({
+        mes: NOMES_MESES_LOCAL[mesAlvo],
+        label: `${NOMES_MESES_LOCAL[mesAlvo]} ${anoAlvo}`,
+        honorarios: valorPrevisto,
+        meta30: honorarioAnterior * 1.3,
+        crescimentoHonorarios: crescimento,
+        atingiuMeta: crescimento !== null && crescimento >= 0.3,
+        quantidade: 0,
+        mesNumero: mesAlvo,
+        ano: anoAlvo,
+        previsao: true,
+        confianca: temTendencia ? Math.max(0.4, 1 - (mesesAFrente - 1) * 0.12) : 0.25,
+      });
+      honorarioAnterior = valorPrevisto;
+    }
+    return resultado;
+  }, [dadosAtuais.anos.atual, periodosImportados, base2025Info]);
   const analiseMensal = dadosAtuais.comparacao?.tipo === "mes";
   const periodosReconhecidos = periodosImportados.length || periodosAnalisados.length;
   const paresAnuaisComparaveis = dadosAtuais.comparativo.filter(
@@ -2294,6 +2759,8 @@ export default function AnaliseHonorariosPage() {
     const cortesDivergentes = cortesReconhecidos.length > 1;
     const transicoesCalculadas = comparacaoMensal ? Math.max(0, periodosAnalisados.length - 1) : paresAnuaisComparaveis;
     const transicoesComparaveis = comparacaoSuficiente ? transicoesCalculadas : 0;
+    const anosBaseLocal = Array.from(new Set((baseAnualLocal?.periodos || []).map((periodo) => periodo.ano))).sort();
+    const mesesBaseLocal = baseAnualLocal?.periodos.length || 0;
     const baseHistorica: RadarStatus = transicoesComparaveis >= 2 ? "bom" : transicoesComparaveis ? "alerta" : "alerta";
     const statusAnexos: RadarStatus = arquivosFalhos.length ? (arquivosComLinhas ? "alerta" : "critico") : "bom";
     const statusSobreposicao: RadarStatus = periodosSobrepostos.length ? "alerta" : "bom";
@@ -2352,6 +2819,14 @@ export default function AnaliseHonorariosPage() {
           : "Cada periodo veio de uma fonte reconhecida.",
         status: statusSobreposicao,
       },
+      {
+        titulo: "Base anual local",
+        valor: mesesBaseLocal ? `${mesesBaseLocal} mes(es)` : "Sem base salva",
+        detalhe: mesesBaseLocal
+          ? `Ano(s) salvos: ${anosBaseLocal.join(", ")}. A Meta anual usa essa base quando o ano anterior nao vem no envio atual.`
+          : "Envie arquivos do ano anterior uma vez para deixar a base salva no navegador.",
+        status: mesesBaseLocal ? "bom" : "alerta",
+      },
     ];
 
     return {
@@ -2367,6 +2842,7 @@ export default function AnaliseHonorariosPage() {
       checagens,
     };
   }, [
+    baseAnualLocal,
     comparacaoBloqueadaPorBase,
     comparacaoMensal,
     comparacaoSuficiente,
@@ -2397,7 +2873,10 @@ export default function AnaliseHonorariosPage() {
       const periodosLidos = relatorio.periodosImportados?.length || relatorio.periodos.length;
       const anexosFalhos = relatorio.auditoria.filter((item) => item.tipo === "Arquivo sem linhas reconhecidas").length;
       setRelatorioUpload(relatorio);
+      setModoMetaCompetencia(sugerirModoMetaCompetencia(relatorio));
       salvarRelatorioCache(relatorio);
+      salvarBaseAnualCache(relatorio);
+      setBaseAnualLocal(carregarBaseAnualCache());
       setStatusUpload(
         `Analise atualizada: ${relatorio.totalLinhas || 0} linhas, ${periodosLidos} periodo(s), ${anexosFalhos} anexo(s) sem linhas${duplicadosIgnorados ? ` e ${duplicadosIgnorados} duplicado(s) ignorado(s)` : ""}.`
       );
@@ -2433,6 +2912,7 @@ export default function AnaliseHonorariosPage() {
     setServicosSelecionados([]);
     setBuscaServicoFiltro("");
     setRecorteSelecionado("todos");
+    setModoMetaCompetencia("mes-atual");
     limparRelatorioCache();
   };
 
@@ -2442,6 +2922,14 @@ export default function AnaliseHonorariosPage() {
     const qtdResumo = pegarIndicador(dadosAtuais.resumo, "Quantidade total");
     const primeiroPeriodo = periodosAnalisados[0];
     const ultimoPeriodo = periodosAnalisados[periodosAnalisados.length - 1];
+    const totaisDoRecorte = periodosAnalisados.reduce(
+      (acc, periodo) => ({
+        honorarios: acc.honorarios + periodo.honorarios,
+        valorOs: acc.valorOs + periodo.valorOs,
+        quantidade: acc.quantidade + periodo.quantidade,
+      }),
+      { honorarios: 0, valorOs: 0, quantidade: 0 }
+    );
     const honorariosAnteriorComparacao = comparacaoMensal ? primeiroPeriodo?.honorarios || 0 : honorariosResumo?.valor2025 || 0;
     const honorariosAtualComparacao = comparacaoMensal ? ultimoPeriodo?.honorarios || 0 : honorariosResumo?.valor2026 || 0;
     const valorOsAnteriorComparacao = comparacaoMensal ? primeiroPeriodo?.valorOs || 0 : osResumo?.valor2025 || 0;
@@ -2449,9 +2937,16 @@ export default function AnaliseHonorariosPage() {
     const quantidadeAnteriorComparacao = comparacaoMensal ? primeiroPeriodo?.quantidade || 0 : qtdResumo?.valor2025 || 0;
     const quantidadeAtualComparacao = comparacaoMensal ? ultimoPeriodo?.quantidade || 0 : qtdResumo?.valor2026 || 0;
     const melhorMes = [...dadosAtuais.comparativo].sort((a, b) => b.honorarios2026 - a.honorarios2026)[0];
-    const servicoLider = [...dadosAtuais.servicos].sort((a, b) => b.honorarios2026 - a.honorarios2026)[0];
+    const servicoLiderHistorico = [...(dadosAtuais.servicosPorPeriodo || [])].sort((a, b) => b.totalHonorarios - a.totalHonorarios)[0];
+    const servicoLiderComparativo = [...dadosAtuais.servicos].sort((a, b) => b.honorarios2026 - a.honorarios2026)[0];
+    const servicoLider = servicoLiderHistorico
+      ? { servico: servicoLiderHistorico.servico, honorarios2026: servicoLiderHistorico.totalHonorarios }
+      : servicoLiderComparativo;
 
     return {
+      honorariosRecorte: totaisDoRecorte.honorarios || honorariosResumo?.valor2026 || 0,
+      valorOsRecorte: totaisDoRecorte.valorOs || osResumo?.valor2026 || 0,
+      quantidadeRecorte: totaisDoRecorte.quantidade || qtdResumo?.valor2026 || 0,
       honorariosAtualComparacao,
       honorariosAnteriorComparacao,
       ganhoIncremental: honorariosAtualComparacao - honorariosAnteriorComparacao,
@@ -2467,13 +2962,85 @@ export default function AnaliseHonorariosPage() {
     };
   }, [comparacaoMensal, dadosAtuais, periodosAnalisados, planoCompetencia, valorOsDisponivel]);
 
+  const contextoAnalise = useMemo(() => {
+    const labels = periodosAnalisados.map((periodo) => periodo.label);
+    const trilhaCompleta = labels.length ? labels.join(" -> ") : "-";
+    const recorteLabel = recorteTemporalAtivo?.key === "todos" ? "Todos os periodos" : recorteTemporalAtivo?.label || "Recorte ativo";
+    const servicosAtivos = servicosFiltro.length || (dadosServico.servicosPorPeriodo || []).length || (dadosAtuais.servicosPorPeriodo || []).length;
+    const filtroServicos = servicosSelecionadosAtivos.length
+      ? `${servicosSelecionadosAtivos.length} servico(s) selecionado(s)`
+      : servicosAtivos
+        ? `todos os ${servicosAtivos} servico(s) ativos`
+        : "sem filtro de servico";
+    const multiperiodo = analiseMensal && labels.length > 2;
+
+    return {
+      labels,
+      trilhaCompleta,
+      recorteLabel,
+      filtroServicos,
+      multiperiodo,
+      periodoResumo: labels.length
+        ? `${labels.length} periodo(s): ${juntarLista(labels)}`
+        : periodoDocumentoTexto,
+      topoTitulo: multiperiodo
+        ? `${labels.length} periodo(s) no filtro`
+        : periodoDocumentoTexto,
+      topoDetalhe: multiperiodo
+        ? `${recorteLabel}; ${filtroServicos}. Trilha usada: ${trilhaCompleta}.`
+        : `${recorteLabel}; ${filtroServicos}.`,
+    };
+  }, [
+    analiseMensal,
+    dadosAtuais.servicosPorPeriodo,
+    dadosServico.servicosPorPeriodo,
+    periodosAnalisados,
+    periodoDocumentoTexto,
+    recorteTemporalAtivo,
+    servicosFiltro.length,
+    servicosSelecionadosAtivos.length,
+  ]);
+
   const metaFuncionarios = useMemo(() => {
     const funcionarios = Math.max(1, Math.floor(quantidadeFuncionarios || 1));
     const baseMes = planoCompetencia?.baseMeta || totais.honorariosAtualComparacao || 0;
     const alvoMes = planoCompetencia?.meta || totais.metaProximoPeriodo || 0;
     const adicionalMes = Math.max(0, alvoMes - baseMes);
-    const realizadoMes = planoCompetencia?.realizado || totais.honorariosAtualComparacao || 0;
-    const faltaMes = Math.max(0, alvoMes - realizadoMes);
+    const competenciaFechada = Boolean(planoCompetencia?.modo === "mes-anterior" && planoCompetencia.realizado > 0 && !planoCompetencia.emAndamento);
+    const competenciaSemDados = Boolean(planoCompetencia && !planoCompetencia.realizado && !planoCompetencia.emAndamento);
+    const realizadoMes = planoCompetencia ? planoCompetencia.realizado : totais.honorariosAtualComparacao || 0;
+    const referenciaFaltaMes = competenciaSemDados ? planoCompetencia?.projecao || 0 : realizadoMes;
+    const faltaMes = competenciaFechada ? 0 : Math.max(0, alvoMes - referenciaFaltaMes);
+    const metaCrescimento = planoCompetencia?.metaCrescimento || dadosAtuais.comparacao?.metaCrescimento || 0.3;
+    const periodosMeta = periodosImportadosDoRelatorio(dadosServico);
+    const labelsBase = new Set(planoCompetencia?.periodosBase || []);
+    const periodosBaseOs = labelsBase.size ? periodosMeta.filter((periodo) => labelsBase.has(periodo.label)) : [];
+    const periodoAlvoOs = planoCompetencia
+      ? periodosMeta.find(
+          (periodo) => periodo.ano === planoCompetencia.ano && periodo.mesNumero === planoCompetencia.mesNumero
+        )
+      : null;
+    const baseOs =
+      periodosBaseOs.length
+        ? periodosBaseOs.reduce((total, periodo) => total + periodo.quantidade, 0) / periodosBaseOs.length
+        : totais.quantidadeAnteriorComparacao || totais.quantidadeAtualComparacao || 0;
+    const alvoOs = baseOs * (1 + metaCrescimento);
+    const adicionalOs = Math.max(0, alvoOs - baseOs);
+    const realizadoOs = periodoAlvoOs ? periodoAlvoOs.quantidade : planoCompetencia ? 0 : totais.quantidadeAtualComparacao || 0;
+    const osProjetadas = competenciaSemDados ? baseOs * ((planoCompetencia?.projecao || baseMes) / Math.max(1, baseMes)) : realizadoOs;
+    const faltaOs = competenciaFechada ? 0 : Math.max(0, alvoOs - osProjetadas);
+    const basePorFuncionario = baseMes / funcionarios;
+    const alvoPorFuncionario = alvoMes / funcionarios;
+    const adicionalPorFuncionario = adicionalMes / funcionarios;
+    const faltaPorFuncionario = faltaMes / funcionarios;
+    const baseOsPorFuncionario = baseOs / funcionarios;
+    const alvoOsPorFuncionario = alvoOs / funcionarios;
+    const adicionalOsPorFuncionario = adicionalOs / funcionarios;
+    const faltaOsPorFuncionario = faltaOs / funcionarios;
+    const liderAlvoPorFuncionario = alvoPorFuncionario + faltaPorFuncionario;
+    const liderAlvoOsPorFuncionario = alvoOsPorFuncionario + faltaOsPorFuncionario;
+    const baixoPisoPorFuncionario = Math.max(0, alvoPorFuncionario - faltaPorFuncionario);
+    const baixoPisoOsPorFuncionario = Math.max(0, alvoOsPorFuncionario - faltaOsPorFuncionario);
 
     return {
       funcionarios,
@@ -2481,13 +3048,30 @@ export default function AnaliseHonorariosPage() {
       alvoMes,
       adicionalMes,
       realizadoMes,
+      referenciaFaltaMes,
       faltaMes,
-      basePorFuncionario: baseMes / funcionarios,
-      alvoPorFuncionario: alvoMes / funcionarios,
-      adicionalPorFuncionario: adicionalMes / funcionarios,
-      faltaPorFuncionario: faltaMes / funcionarios,
+      competenciaFechada,
+      competenciaSemDados,
+      basePorFuncionario,
+      alvoPorFuncionario,
+      adicionalPorFuncionario,
+      faltaPorFuncionario,
+      baseOs,
+      alvoOs,
+      adicionalOs,
+      realizadoOs,
+      osProjetadas,
+      faltaOs,
+      baseOsPorFuncionario,
+      alvoOsPorFuncionario,
+      adicionalOsPorFuncionario,
+      faltaOsPorFuncionario,
+      liderAlvoPorFuncionario,
+      liderAlvoOsPorFuncionario,
+      baixoPisoPorFuncionario,
+      baixoPisoOsPorFuncionario,
     };
-  }, [planoCompetencia, quantidadeFuncionarios, totais]);
+  }, [dadosAtuais.comparacao?.metaCrescimento, dadosServico, planoCompetencia, quantidadeFuncionarios, totais]);
 
   const analisePreditiva = useMemo(() => {
     const crescimentos = periodosAnalisados
@@ -2536,21 +3120,25 @@ export default function AnaliseHonorariosPage() {
     const crescimento = totais.crescimentoHonorarios;
     const bateuMeta = crescimento !== null && crescimento >= meta;
     const queda = crescimento !== null && crescimento < 0;
-    const comparacaoTexto = trilhaComparacaoTexto;
-    const fechamentoTexto = fechamentoComparacaoTexto;
+    const comparacaoTexto = contextoAnalise.multiperiodo ? contextoAnalise.trilhaCompleta : trilhaComparacaoTexto;
+    const fechamentoTexto = contextoAnalise.multiperiodo ? contextoAnalise.trilhaCompleta : fechamentoComparacaoTexto;
 
     return {
       comparacaoTexto,
       fechamentoTexto,
-      periodoDocumentoTexto,
-      resultadoLabel: periodoUnico
+      periodoDocumentoTexto: contextoAnalise.periodoResumo,
+      resultadoLabel: contextoAnalise.multiperiodo
+        ? "Total acumulado no recorte"
+        : periodoUnico
         ? "Base inicial para comparacao"
         : comparacaoBloqueadaPorBase
           ? "Base curta para comparacao"
         : totais.ganhoIncremental >= 0
           ? "Ganho no periodo comparado"
           : "Perda no periodo comparado",
-      acerto: periodoUnico
+      acerto: contextoAnalise.multiperiodo
+        ? `Todos os ${contextoAnalise.labels.length} periodo(s) do filtro foram usados. O total acumulado e ${moeda.format(totais.honorariosRecorte)}.`
+        : periodoUnico
         ? `Base carregada: ${totais.servicoLider.servico} liderou os honorarios do periodo importado.`
         : comparacaoBloqueadaPorBase
         ? `Base carregada com ${mesesBaseComparacao} periodo(s); a comparacao exige pelo menos ${MIN_PERIODOS_COMPARACAO}.`
@@ -2574,11 +3162,11 @@ export default function AnaliseHonorariosPage() {
   }, [
     analisePreditiva,
     comparacaoBloqueadaPorBase,
+    contextoAnalise,
     dadosAtuais,
     faltamPeriodosComparacao,
     fechamentoComparacaoTexto,
     mesesBaseComparacao,
-    periodoDocumentoTexto,
     periodoUnico,
     planoCompetencia,
     totais,
@@ -3142,8 +3730,8 @@ export default function AnaliseHonorariosPage() {
         leitura: "Protocolo de preservacao",
         detalhe:
           statusOperacional === "critico"
-            ? `Ativo agora: preservar caixa, auditar preco e recuperar ${servicoHedge?.servico || "SERVICOS MENSAIS LOGISTAS"}.`
-            : `Entra quando score, drawdown ou auditoria ficam no vermelho: caixa primeiro, preco auditado e recuperacao de ${servicoHedge?.servico || "SERVICOS MENSAIS LOGISTAS"}.`,
+            ? `Ativo agora: preservar caixa, auditar preco e recuperar ${servicoHedge?.servico || "receita perdida"}.`
+            : `Entra quando score, drawdown ou auditoria ficam no vermelho: caixa primeiro, preco auditado e recuperacao de ${servicoHedge?.servico || "receita perdida"}.`,
         status: statusOperacional === "critico" ? "critico" : "alerta",
       },
     ];
@@ -3285,6 +3873,761 @@ export default function AnaliseHonorariosPage() {
     totais,
   ]);
 
+  const previsaoCampo = useMemo<PrevisaoCampo | null>(() => {
+    if (!relatorioUpload) return null;
+
+    const periodos = periodosImportadosDoRelatorio(dadosAtuais).filter(
+      (periodo) => periodo.honorarios > 0 || periodo.quantidade > 0
+    );
+    const ultimo = periodos.at(-1);
+    if (!ultimo) return null;
+
+    const ano = ultimo.ano;
+    const periodosAno = periodos.filter((periodo) => periodo.ano === ano);
+    const chaveUltimo = chavePeriodo(ultimo);
+    const coberturaUltimoInfo = coberturaCalendarioDoPeriodo(ultimo);
+    const coberturaUltimo = Math.max(0.05, coberturaUltimoInfo.cobertura || 1);
+    const metaMensal = planoCompetencia?.meta || mediaPonderadaCampo(periodosAno.map((periodo) => periodo.honorarios)) * 1.3;
+    const serie = periodosAno.map((periodo) => {
+      const cobertura = chavePeriodo(periodo) === chaveUltimo ? coberturaUltimo : 1;
+      return {
+        ...periodo,
+        cobertura,
+        previsto: periodo.honorarios / Math.max(0.05, cobertura),
+      };
+    });
+    const ultimoAjustado = serie.at(-1)?.previsto || ultimo.honorarios;
+    const anteriores = serie.slice(0, -1);
+    const realizadoReconhecido = serie.reduce((total, periodo) => total + periodo.honorarios, 0);
+    const realizadoAntesAtual = anteriores.reduce((total, periodo) => total + periodo.honorarios, 0);
+    const realizadoAjustado = realizadoAntesAtual + ultimoAjustado;
+    const valoresAjustados = serie.map((periodo) => periodo.previsto);
+    const crescimentos = valoresAjustados
+      .map((valor, index) => (index > 0 ? pct(valor, valoresAjustados[index - 1]) : null))
+      .filter((valor): valor is number => valor !== null && valor !== undefined && Number.isFinite(valor));
+    const momentum = crescimentos.at(-1) || 0;
+    const volatilidade = desvioPadrao(crescimentos);
+    const ritmoBase = mediaPonderadaCampo(valoresAjustados) || ultimoAjustado;
+    const tendenciaLinear = calcularTendenciaLinear(valoresAjustados);
+    const tendenciaPercentual = ritmoBase ? tendenciaLinear.inclinacao / ritmoBase : 0;
+    const tendenciaMinima = 0.012;
+    const amortecimento = limitarNumero(1 - volatilidade * 2.2, 0.35, 0.9);
+    const tendenciaMensal =
+      valoresAjustados.length >= 3 && Math.abs(tendenciaPercentual) >= tendenciaMinima
+        ? limitarNumero(tendenciaLinear.inclinacao * amortecimento, -ritmoBase * 0.08, ritmoBase * 0.08)
+        : 0;
+    const padrao =
+      valoresAjustados.length < 3
+        ? "Base curta"
+        : tendenciaMensal > ritmoBase * tendenciaMinima
+          ? "Crescimento"
+          : tendenciaMensal < -ritmoBase * tendenciaMinima
+            ? "Queda"
+            : "Estabilidade";
+    const mesesRestantes = Math.max(0, 12 - ultimo.mesNumero);
+    const confiancaPadrao = limitarScore(
+      valoresAjustados.length * 18 +
+        (padrao === "Estabilidade" ? 14 : 18) -
+        Math.round(Math.min(30, volatilidade * 90)) -
+        Math.min(14, qualidadeLeitura.auditoriasReais.length)
+    );
+    const pesoTendencia = confiancaPadrao >= 70 ? 0.55 : confiancaPadrao >= 50 ? 0.45 : 0.32;
+    const previsoesFuturas = Array.from({ length: mesesRestantes }, (_item, index) => {
+      const tendenciaProjetada = (ultimoAjustado || ritmoBase) + tendenciaMensal * (index + 1);
+      return Math.max(0, ritmoBase * (1 - pesoTendencia) + tendenciaProjetada * pesoTendencia);
+    });
+    const ritmoMensal = previsoesFuturas.length ? media(previsoesFuturas) : ritmoBase;
+    const leituraPadrao =
+      padrao === "Crescimento"
+        ? `Padrao dos meses enviados: crescimento de ${moeda.format(Math.abs(tendenciaMensal))}/mes, aplicado com freio.`
+        : padrao === "Queda"
+          ? `Padrao dos meses enviados: queda de ${moeda.format(Math.abs(tendenciaMensal))}/mes, aplicada com freio.`
+          : padrao === "Estabilidade"
+            ? "Padrao dos meses enviados: estabilidade; a previsao usa a media recente."
+            : "Base curta; a previsao usa a media disponivel ate chegar mais historico.";
+    const diaReferencia = coberturaUltimoInfo.diasCobertos || diasNoMes(ano, ultimo.mesNumero);
+    const diasRestantes = diasRestantesDoAno(ano, ultimo.mesNumero, diaReferencia);
+    const metaAno = realizadoAntesAtual + metaMensal * (1 + mesesRestantes);
+    const fatorRisco = Math.max(0.06, Math.min(0.28, volatilidade || 0.08));
+    const previsaoAno = realizadoAjustado + previsoesFuturas.reduce((total, valor) => total + valor, 0);
+    const conservador = realizadoAjustado + previsoesFuturas.reduce((total, valor) => total + Math.max(0, valor * (1 - fatorRisco)), 0);
+    const agressivo =
+      realizadoAjustado +
+      previsoesFuturas.reduce(
+        (total, valor) => total + valor * (1 + Math.max(planoCompetencia?.metaCrescimento || 0.3, momentum) * 0.22),
+        0
+      );
+    const gapAno = Math.max(0, metaAno - previsaoAno);
+    const ritmoDiarioNecessario = Math.max(0, (metaAno - realizadoReconhecido) / Math.max(1, diasRestantes));
+    const confianca = limitarScore(
+      periodosAno.length * 18 +
+        Math.round(coberturaUltimo * 18) +
+        (crescimentos.length ? 18 : 6) -
+        Math.round(Math.min(30, volatilidade * 80)) -
+        Math.min(18, qualidadeLeitura.auditoriasReais.length * 2)
+    );
+    const status: RadarStatus =
+      previsaoAno >= metaAno ? "bom" : previsaoAno >= metaAno * 0.92 ? "alerta" : "critico";
+
+    const servicos = (dadosAtuais.servicosPorPeriodo || [])
+      .map((servico) => {
+        const serieServico = ordenarPeriodos(servico.periodos.filter((periodo) => periodo.ano === ano));
+        const atual = serieServico.find((periodo) => chavePeriodo(periodo) === chaveUltimo);
+        const anterior = serieServico.filter((periodo) => chavePeriodo(periodo) !== chaveUltimo).at(-1);
+        const atualAjustado = atual ? atual.honorarios / coberturaUltimo : 0;
+        const tendencia = anterior ? pct(atualAjustado, anterior.honorarios) : null;
+        const totalReconhecido = serieServico.reduce((total, periodo) => total + periodo.honorarios, 0);
+        const previsaoAnoServico = totalReconhecido + atualAjustado * mesesRestantes;
+        const statusServico: RadarStatus =
+          tendencia !== null && tendencia < -0.12 ? "critico" : tendencia !== null && tendencia < 0.08 ? "alerta" : "bom";
+        const acao =
+          statusServico === "critico"
+            ? "Chamar clientes antigos, revisar preco e tentar recuperar a venda."
+            : statusServico === "alerta"
+              ? "Manter o servico vivo e oferecer junto com outro produto."
+              : "Repetir a oferta, porque esse servico ja esta respondendo bem.";
+
+        return {
+          codigo: servico.codigo,
+          servico: servico.servico,
+          atual: atualAjustado,
+          tendencia,
+          previsaoAno: previsaoAnoServico,
+          acao,
+          status: statusServico,
+        };
+      })
+      .filter((servico) => servico.atual > 0 || servico.previsaoAno > 0)
+      .sort((a, b) => b.previsaoAno - a.previsaoAno)
+      .slice(0, 6);
+
+    const servicoForte = servicos.find((servico) => servico.status === "bom")?.servico || planoPnvaCore?.servicoForte || "servico lider";
+    const servicoRisco =
+      servicos.find((servico) => servico.status === "critico")?.servico || planoPnvaCore?.servicoCritico || "servico em risco";
+    const periodoBase = `${periodosAno[0]?.label || ultimo.label} a ${ultimo.label}`;
+    const diagnostico =
+      status === "bom"
+        ? `Se continuar nesse ritmo, a meta do ano fica ao alcance. Agora e repetir o que ja vende bem: ${servicoForte}.`
+        : status === "alerta"
+          ? `Esta perto, mas ainda nao pode relaxar. O caixa precisa de pelo menos ${moeda.format(ritmoDiarioNecessario)} por dia ate dezembro.`
+          : `Do jeito que esta, falta dinheiro para bater a meta. O primeiro trabalho e recuperar ${servicoRisco} e buscar mais ${moeda.format(gapAno)}.`;
+    const decisao =
+      status === "critico"
+        ? "Hoje: escolher um servico para recuperar, ligar para clientes quentes e fechar caixa antes de abrir novas frentes."
+        : status === "alerta"
+          ? "Todo dia: olhar o valor vendido, comparar com a meta diaria e corrigir o que ficou para tras."
+          : "Manter simples: repetir o servico vencedor, cuidar do preco e acompanhar o caixa toda semana.";
+
+    const equacoes: PrevisaoCampo["equacoes"] = [
+      {
+        nome: "Padrao previsto",
+        formula: "media recente + tendencia dos meses enviados",
+        resultado: moeda.format(ritmoMensal),
+        leitura: `${leituraPadrao} Ultimo mes ajustado: ${moeda.format(ultimoAjustado)}.`,
+        status: ritmoMensal >= metaMensal ? "bom" : ritmoMensal >= metaMensal * 0.9 ? "alerta" : "critico",
+      },
+      {
+        nome: "Quanto pode fechar no ano",
+        formula: "o que ja entrou + previsao mes a mes ate dezembro",
+        resultado: moeda.format(previsaoAno),
+        leitura: `Ainda faltam ${mesesRestantes} mes(es) no ano ${ano}. Padrao: ${padrao}.`,
+        status,
+      },
+      {
+        nome: "Meta do ano",
+        formula: "a meta mensal aplicada ate o fim do ano",
+        resultado: moeda.format(metaAno),
+        leitura: `A meta mensal usada foi ${moeda.format(metaMensal)}.`,
+        status: gapAno ? "alerta" : "bom",
+      },
+      {
+        nome: "Valor por dia",
+        formula: "o que falta dividido pelos dias restantes",
+        resultado: moeda.format(ritmoDiarioNecessario),
+        leitura: `Tem ${diasRestantes} dia(s) ate 31/12/${ano}.`,
+        status: ritmoDiarioNecessario > ritmoMensal / 20 ? "alerta" : "bom",
+      },
+    ];
+
+    const missoes: PrevisaoCampo["missoes"] = [
+      {
+        etapa: "P",
+        titulo: "Primeiro foco",
+        missao: status === "critico" ? `Recuperar ${servicoRisco}.` : `Escalar ${servicoForte}.`,
+        como:
+          status === "critico"
+            ? "Pegar os clientes que ja compraram, chamar no WhatsApp e perguntar o que falta para fechar de novo."
+            : "Usar esse servico como porta de entrada e oferecer uma combinacao simples.",
+        indicador: status === "critico" ? "Receita recuperada" : "Conversas abertas",
+        prazo: "Hoje",
+        status,
+      },
+      {
+        etapa: "N",
+        titulo: "Numero do dia",
+        missao: `Gerar ${moeda.format(ritmoDiarioNecessario)} por dia ate 31/12/${ano}.`,
+        como: "No fim do dia, ver quanto entrou e quanto faltou. O numero do dia mostra se esta no caminho.",
+        indicador: `Falta hoje: ${moeda.format(gapAno)}`,
+        prazo: "Todo dia",
+        status: gapAno ? "alerta" : "bom",
+      },
+      {
+        etapa: "V",
+        titulo: "Venda simples",
+        missao: `Criar uma oferta clara para ${servicoForte}.`,
+        como: "Usar a mesma mensagem por 7 dias, com lista, retorno e fechamento. So trocar se nao gerar conversa.",
+        indicador: "Fechamentos por campanha",
+        prazo: "7 dias",
+        status: "bom",
+      },
+      {
+        etapa: "A",
+        titulo: "Cuidar do preco",
+        missao: qualidadeLeitura.auditoriasReais.length
+          ? `Revisar ${qualidadeLeitura.auditoriasReais.length} ponto(s) que podem estar tirando margem.`
+          : "Manter preco e honorario medio sob controle.",
+        como: "Antes de vender mais barato, conferir se o servico ainda deixa dinheiro no caixa.",
+        indicador: "Preco protegido",
+        prazo: "48h",
+        status: qualidadeLeitura.auditoriasReais.length >= 5 ? "critico" : qualidadeLeitura.auditoriasReais.length ? "alerta" : "bom",
+      },
+    ];
+
+    const roteiro: PrevisaoCampo["roteiro"] = [
+      {
+        janela: "Hoje",
+        missao: "Escolher o servico do dia.",
+        estatistica: `Confianca do motor: ${confianca}%.`,
+        execucao: `Comecar por ${status === "critico" ? servicoRisco : servicoForte}. Uma pessoa fica responsavel e anota o resultado.`,
+        status,
+      },
+      {
+        janela: "7 dias",
+        missao: "Repetir a mesma oferta.",
+        estatistica: `Meta do mes: ${moeda.format(metaMensal)}.`,
+        execucao: "Mandar mensagem, cobrar retorno e fechar. Se deu conversa, repetir. Se nao deu, ajustar a frase.",
+        status: gapAno ? "alerta" : "bom",
+      },
+      {
+        janela: "30 dias",
+        missao: "Ver se o mes ficou no trilho.",
+        estatistica: `Conservador/base/agressivo: ${moeda.format(conservador)} / ${moeda.format(previsaoAno)} / ${moeda.format(agressivo)}.`,
+        execucao: "Se ficou abaixo, recuperar clientes. Se ficou acima, aumentar o foco no servico vencedor.",
+        status: previsaoAno >= metaAno ? "bom" : "alerta",
+      },
+      {
+        janela: `Ate dezembro/${ano}`,
+        missao: "Bater a meta do ano.",
+        estatistica: `Meta: ${moeda.format(metaAno)}. Falta: ${moeda.format(gapAno)}.`,
+        execucao: "Olhar o caixa todo dia, revisar preco toda semana e nao espalhar energia em muitos servicos.",
+        status,
+      },
+    ];
+
+    const grafico: PrevisaoCampo["grafico"] = [
+      ...serie.map((periodo) => ({
+        label: rotuloPeriodoCurto(periodo),
+        realizado: periodo.honorarios,
+        previsto: periodo.previsto,
+        meta: metaMensal,
+      })),
+    ];
+    let cursor = proximaCompetencia(ultimo.ano, ultimo.mesNumero);
+    for (let index = 0; index < mesesRestantes; index += 1) {
+      grafico.push({
+        label: rotuloPeriodoCurto(cursor),
+        realizado: 0,
+        previsto: previsoesFuturas[index] || ritmoMensal,
+        meta: metaMensal,
+      });
+      cursor = proximaCompetencia(cursor.ano, cursor.mesNumero);
+    }
+
+    return {
+      ano,
+      status,
+      diagnostico,
+      decisao,
+      periodoBase,
+      padrao,
+      leituraPadrao,
+      confianca,
+      realizadoReconhecido,
+      realizadoAjustado,
+      metaAno,
+      previsaoAno,
+      conservador,
+      agressivo,
+      gapAno,
+      ritmoMensal,
+      ritmoDiarioNecessario,
+      mesesRestantes,
+      diasRestantes,
+      coberturaUltimo,
+      equacoes,
+      missoes,
+      roteiro,
+      servicos,
+      grafico,
+    };
+  }, [dadosAtuais, planoCompetencia, planoPnvaCore, qualidadeLeitura.auditoriasReais.length, relatorioUpload]);
+
+  const metaAnual = useMemo<MetaAnual | null>(() => {
+    if (!relatorioUpload) return null;
+
+    const periodos = periodosImportadosDoRelatorio(dadosAtuais).filter(
+      (periodo) => periodo.honorarios > 0 || periodo.quantidade > 0
+    );
+    const ultimo = periodos.at(-1);
+    if (!ultimo) return null;
+
+    const ano = ultimo.ano;
+    const periodosAno = periodos.filter((periodo) => periodo.ano === ano);
+    const periodosAnoAnteriorMap = new Map<string, { ano: number; mesNumero: number; honorarios: number; label?: string }>();
+    baseAnualLocal?.periodos
+      .filter((periodo) => periodo.ano === ano - 1)
+      .forEach((periodo) => periodosAnoAnteriorMap.set(`${periodo.ano}-${periodo.mesNumero}`, periodo));
+    periodos
+      .filter((periodo) => periodo.ano === ano - 1)
+      .forEach((periodo) => periodosAnoAnteriorMap.set(`${periodo.ano}-${periodo.mesNumero}`, periodo));
+    const periodosAnoAnterior = Array.from(periodosAnoAnteriorMap.values());
+    const baseAnoAnterior = periodosAnoAnterior.reduce((total, periodo) => total + periodo.honorarios, 0);
+    const mesesBaseAnoAnterior = new Set(periodosAnoAnterior.map((periodo) => periodo.mesNumero)).size;
+    const chaveUltimo = chavePeriodo(ultimo);
+    const coberturaUltimo = Math.max(0.05, coberturaCalendarioDoPeriodo(ultimo).cobertura || 1);
+    const valoresAjustados = periodosAno.map((periodo) =>
+      chavePeriodo(periodo) === chaveUltimo ? periodo.honorarios / coberturaUltimo : periodo.honorarios
+    );
+    const ritmoMensal = mediaPonderadaCampo(valoresAjustados) || media(valoresAjustados) || ultimo.honorarios;
+    const realizado = periodosAno.reduce((total, periodo) => total + periodo.honorarios, 0);
+    const mesesRealizados = new Set(periodosAno.map((periodo) => periodo.mesNumero)).size;
+    const mesesRestantes = Math.max(0, 12 - ultimo.mesNumero);
+    const baseProjetada = baseAnoAnterior > 0 ? baseAnoAnterior : ritmoMensal * 12;
+    const metaAno = Math.max(1, baseProjetada * (1 + (dadosAtuais.comparacao?.metaCrescimento || 0.3)));
+    const projecao = realizado + ritmoMensal * mesesRestantes;
+    const falta = Math.max(0, metaAno - realizado);
+    const ritmoNecessarioMes = mesesRestantes ? falta / mesesRestantes : falta;
+    const percentualAno = realizado / metaAno;
+    const status: RadarStatus = projecao >= metaAno ? "bom" : percentualAno >= Math.max(0.08, (ultimo.mesNumero / 12) * 0.85) ? "alerta" : "critico";
+    const origemBase =
+      baseAnoAnterior > 0
+        ? `Base ${ano - 1} consolidada com ${mesesBaseAnoAnterior} mes(es) salvos/enviados e crescimento de ${formatarPercentual(dadosAtuais.comparacao?.metaCrescimento || 0.3).replace("+", "")}`
+        : `Base estimada pelo ritmo de ${contextoAnalise.periodoResumo}`;
+    const mensagem =
+      status === "bom"
+        ? `No caminho certo. Projecao de fechamento: ${moeda.format(projecao)} (${Math.round((projecao / metaAno) * 100)}% da meta).`
+        : status === "alerta"
+          ? `Acompanhar de perto. Faltam ${moeda.format(falta)} e o ritmo necessario e ${moeda.format(ritmoNecessarioMes)}/mes.`
+          : `Meta em risco. Falta recuperar ${moeda.format(falta)} com foco nos servicos abaixo.`;
+
+    const realizadoPorMes = new Map<number, number>();
+    periodosAno.forEach((periodo) => {
+      realizadoPorMes.set(periodo.mesNumero, (realizadoPorMes.get(periodo.mesNumero) || 0) + periodo.honorarios);
+    });
+    const primeiroMes = Math.min(...periodosAno.map((periodo) => periodo.mesNumero));
+    let acumuladoRealizado = 0;
+    const grafico = Array.from({ length: 12 }, (_, index) => {
+      const mesNumero = index + 1;
+      acumuladoRealizado += realizadoPorMes.get(mesNumero) || 0;
+
+      return {
+        mes: rotuloPeriodoCurto({ ano, mesNumero }),
+        metaAcumulada: (metaAno / 12) * mesNumero,
+        realizadoAcumulado:
+          mesNumero < primeiroMes || mesNumero > ultimo.mesNumero
+            ? null
+            : acumuladoRealizado,
+      };
+    });
+
+    const esperadoAteAgora = Math.max(0.08, ultimo.mesNumero / 12);
+    const servicos = (dadosAtuais.servicosPorPeriodo || [])
+      .map<MetaAnualServico>((servico) => {
+        const periodosServicoAno = servico.periodos.filter((periodo) => periodo.ano === ano);
+        const realizadoServico = periodosServicoAno.reduce((total, periodo) => total + periodo.honorarios, 0);
+        const baseAnteriorServicoAtual = servico.periodos
+          .filter((periodo) => periodo.ano === ano - 1)
+          .reduce((total, periodo) => total + periodo.honorarios, 0);
+        const mesesServicoAtual = new Set(servico.periodos.filter((periodo) => periodo.ano === ano - 1).map((periodo) => periodo.mesNumero));
+        const baseAnteriorServicoLocal = (baseAnualLocal?.servicos || [])
+          .filter((periodo) => periodo.ano === ano - 1 && !mesesServicoAtual.has(periodo.mesNumero))
+          .filter((periodo) => periodo.codigo === String(servico.codigo) || periodo.servico === servico.servico)
+          .reduce((total, periodo) => total + periodo.honorarios, 0);
+        const baseAnteriorServico = baseAnteriorServicoAtual + baseAnteriorServicoLocal;
+        const valoresServico = periodosServicoAno.map((periodo) =>
+          chavePeriodo(periodo) === chaveUltimo ? periodo.honorarios / coberturaUltimo : periodo.honorarios
+        );
+        const ritmoServico = mediaPonderadaCampo(valoresServico) || media(valoresServico) || 0;
+        const metaServico = Math.max(1, (baseAnteriorServico > 0 ? baseAnteriorServico : ritmoServico * 12) * (1 + (dadosAtuais.comparacao?.metaCrescimento || 0.3)));
+        const projecaoServico = realizadoServico + ritmoServico * mesesRestantes;
+        const percentual = realizadoServico / metaServico;
+        const progresso = Math.min(100, (projecaoServico / metaServico) * 100);
+        const statusServico: RadarStatus =
+          projecaoServico >= metaServico ? "bom" : percentual >= esperadoAteAgora * 0.85 ? "alerta" : "critico";
+
+        return {
+          codigo: servico.codigo,
+          servico: servico.servico,
+          meta: metaServico,
+          realizado: realizadoServico,
+          percentual,
+          projecao: projecaoServico,
+          progresso,
+          status: statusServico,
+          statusLabel: statusServico === "bom" ? "Meta superada" : statusServico === "alerta" ? "Dentro do esperado" : "Atencao",
+        };
+      })
+      .filter((servico) => servico.realizado > 0 || servico.projecao > 0)
+      .sort((a, b) => b.meta - a.meta)
+      .slice(0, 14);
+
+    return {
+      ano,
+      status,
+      titulo: `Metas ${ano}`,
+      subtitulo: `Meta anual dinamica com ${formatarPercentual(dadosAtuais.comparacao?.metaCrescimento || 0.3).replace("+", "")} de crescimento, baseada no recorte e nos servicos filtrados.`,
+      baseLabel: baseAnoAnterior > 0 ? `${ano - 1} (${mesesBaseAnoAnterior} mes(es))` : contextoAnalise.periodoResumo,
+      origemBase,
+      metaAno,
+      realizado,
+      falta,
+      projecao,
+      ritmoNecessarioMes,
+      percentualAno,
+      mesesRealizados,
+      mesesRestantes,
+      mensagem,
+      servicos,
+      grafico,
+    };
+  }, [baseAnualLocal, contextoAnalise, dadosAtuais, relatorioUpload]);
+
+  const organismoVivo = useMemo<OrganismoVivo | null>(() => {
+    if (!relatorioUpload) return null;
+
+    const status: RadarStatus =
+      previsaoCampo?.status === "critico" || planoCompetencia?.status === "critico" || radarDecisor?.statusGeral === "critico"
+        ? "critico"
+        : previsaoCampo?.status === "alerta" || planoCompetencia?.status === "alerta" || radarDecisor?.statusGeral === "alerta"
+          ? "alerta"
+          : "bom";
+    const gapCampo = previsaoCampo?.gapAno || planoCompetencia?.gapProjetado || 0;
+    const metaMes = planoCompetencia?.meta || totais.metaProximoPeriodo || 0;
+    const previsao = previsaoCampo?.previsaoAno || analisePreditiva.previsaoProximo || 0;
+    const servicoForte = planoPnvaCore?.servicoForte || analisePreditiva.servicoOportunidade?.servico || totais.servicoLider.servico;
+    const servicoRisco = planoPnvaCore?.servicoCritico || analisePreditiva.servicoCritico?.servico || "servico em risco";
+    const auditorias = qualidadeLeitura.auditoriasReais.length;
+    const pulso =
+      status === "critico"
+        ? "Recuperacao ativa"
+        : status === "alerta"
+          ? "Ajuste de ritmo"
+          : "Escala controlada";
+    const comando =
+      status === "critico"
+        ? `Corrigir ${servicoRisco}, proteger margem e criar ${moeda.format(gapCampo)} de recuperacao.`
+        : status === "alerta"
+          ? `Acompanhar o numero diario, reforcar ${servicoForte} e eliminar vazamentos antes do fechamento.`
+          : `Repetir ${servicoForte}, manter o ritmo e transformar a vantagem em rotina.`;
+    const diagnostico =
+      previsaoCampo?.diagnostico ||
+      planoPnvaCore?.decisao ||
+      "O sistema usa os relatorios enviados para ligar meta, previsao, servicos, auditoria e execucao diaria.";
+
+    return {
+      status,
+      pulso,
+      comando,
+      diagnostico,
+      placar: [
+        {
+          label: "Meta viva",
+          valor: moeda.format(metaMes),
+          detalhe: planoCompetencia?.label || "competencia alvo",
+          status: planoCompetencia?.status || status,
+        },
+        {
+          label: "Previsao",
+          valor: moeda.format(previsao),
+          detalhe: previsaoCampo ? `Ano ${previsaoCampo.ano}` : `Risco ${analisePreditiva.risco}`,
+          status: previsaoCampo?.status || (analisePreditiva.risco === "Alto" ? "critico" : analisePreditiva.risco === "Medio" ? "alerta" : "bom"),
+        },
+        {
+          label: "Gap",
+          valor: moeda.format(gapCampo),
+          detalhe: gapCampo ? "precisa de acao" : "sem gap previsto",
+          status: gapCampo ? "alerta" : "bom",
+        },
+        {
+          label: "Auditoria",
+          valor: auditorias ? `${auditorias}` : "0",
+          detalhe: auditorias ? "ponto(s) para revisar" : "sem distorcao grave",
+          status: auditorias >= 6 ? "critico" : auditorias ? "alerta" : "bom",
+        },
+      ],
+      ciclo: [
+        {
+          etapa: "P",
+          titulo: "Prioridade",
+          numero: servicoForte,
+          missao: status === "critico" ? `Recuperar ${servicoRisco}.` : `Escalar ${servicoForte}.`,
+          status,
+        },
+        {
+          etapa: "N",
+          titulo: "Numero",
+          numero: previsaoCampo ? moeda.format(previsaoCampo.ritmoDiarioNecessario) : moeda.format(planoCompetencia?.gapProjetado || 0),
+          missao: previsaoCampo
+            ? "Fechar o dia olhando o numero diario."
+            : "Acompanhar realizado, projecao e gap da meta.",
+          status: gapCampo ? "alerta" : "bom",
+        },
+        {
+          etapa: "V",
+          titulo: "Venda",
+          numero: servicoForte,
+          missao: "Transformar o servico vencedor em campanha repetivel.",
+          status: "bom",
+        },
+        {
+          etapa: "A",
+          titulo: "Acao",
+          numero: auditorias ? `${auditorias} revisao(oes)` : "controle limpo",
+          missao: auditorias ? "Auditar preco, repasse e honorario medio." : "Manter controle de margem.",
+          status: auditorias >= 6 ? "critico" : auditorias ? "alerta" : "bom",
+        },
+      ],
+      sinais: [
+        `Base: ${dadosAtuais.comparacao?.atualLabel || planoCompetencia?.label || "periodo enviado"}`,
+        `Servicos ativos: ${(dadosServico.servicosPorPeriodo || []).length}`,
+        `Marketing: ${marketingInteligente.metricas.totalAnuncios} anuncio(s) sugerido(s)`,
+        `Funcionarios: ${quantidadeFuncionarios}`,
+      ],
+    };
+  }, [
+    analisePreditiva,
+    dadosAtuais.comparacao?.atualLabel,
+    dadosServico.servicosPorPeriodo,
+    marketingInteligente.metricas.totalAnuncios,
+    planoCompetencia,
+    planoPnvaCore,
+    previsaoCampo,
+    qualidadeLeitura.auditoriasReais.length,
+    quantidadeFuncionarios,
+    radarDecisor,
+    relatorioUpload,
+    totais.metaProximoPeriodo,
+    totais.servicoLider.servico,
+  ]);
+
+  const planoFinanceiro = useMemo<PlanoFinanceiro | null>(() => {
+    if (!relatorioUpload) return null;
+
+    const periodos = periodosImportadosDoRelatorio(dadosAtuais);
+    const periodoAtual = periodos.at(-1);
+    if (!periodoAtual) return null;
+
+    const periodoAnterior = periodos.slice(0, -1).at(-1) || null;
+    const chaveAtual = chavePeriodo(periodoAtual);
+    const chaveAnterior = periodoAnterior ? chavePeriodo(periodoAnterior) : "";
+    const servicosFonte = dadosAtuais.servicosPorPeriodo || [];
+    const totalAtual = servicosFonte.reduce((total, servico) => {
+      const periodo = servico.periodos.find((item) => chavePeriodo(item) === chaveAtual);
+      return total + (periodo?.honorarios || 0);
+    }, 0);
+    const totalValorOs = servicosFonte.reduce((total, servico) => {
+      const periodo = servico.periodos.find((item) => chavePeriodo(item) === chaveAtual);
+      return total + (periodo?.valorOs || 0);
+    }, 0);
+    const totalQuantidade = servicosFonte.reduce((total, servico) => {
+      const periodo = servico.periodos.find((item) => chavePeriodo(item) === chaveAtual);
+      return total + (periodo?.quantidade || 0);
+    }, 0);
+    const ticketMedio = totalQuantidade ? totalAtual / totalQuantidade : 0;
+
+    const produtos = servicosFonte
+      .map<PlanoFinanceiroProduto>((servico) => {
+        const atual = servico.periodos.find((item) => chavePeriodo(item) === chaveAtual);
+        const anterior = chaveAnterior ? servico.periodos.find((item) => chavePeriodo(item) === chaveAnterior) : null;
+        const honorarios = atual?.honorarios || 0;
+        const valorOs = atual?.valorOs || 0;
+        const quantidade = atual?.quantidade || 0;
+        const participacao = totalAtual ? honorarios / totalAtual : 0;
+        const margem = valorOsDisponivel && valorOs ? honorarios / valorOs : 0;
+        const ticket = quantidade ? honorarios / quantidade : 0;
+        const tendencia = anterior ? pct(honorarios, anterior.honorarios) : null;
+        const status: RadarStatus =
+          tendencia !== null && tendencia < -0.12
+            ? "critico"
+            : participacao >= 0.32 || (valorOsDisponivel && margem > 0 && margem < 0.06)
+              ? "alerta"
+              : "bom";
+        const papel =
+          participacao >= 0.22
+            ? "Motor de caixa"
+            : tendencia !== null && tendencia > 0.2
+              ? "Produto em escala"
+              : tendencia !== null && tendencia < -0.12
+                ? "Recuperacao"
+                : ticket >= ticketMedio
+                  ? "Margem seletiva"
+                  : "Esteira de volume";
+        const acao =
+          papel === "Motor de caixa"
+            ? "Proteger margem, prazo e atendimento; nao deixar o produto lider virar gargalo."
+            : papel === "Produto em escala"
+              ? "Criar campanha e rotina semanal para transformar crescimento em caixa recorrente."
+              : papel === "Recuperacao"
+                ? "Revisar preco, demanda e lista de clientes antes de empurrar volume."
+                : papel === "Margem seletiva"
+                  ? "Vender com criterio, sem desconto automatico, e usar como complemento de caixa."
+                  : "Padronizar processo e volume para gerar caixa sem consumir energia demais.";
+
+        return {
+          codigo: servico.codigo,
+          servico: servico.servico,
+          honorarios,
+          valorOs,
+          quantidade,
+          participacao,
+          margem,
+          ticket,
+          tendencia,
+          papel,
+          acao,
+          status,
+        };
+      })
+      .filter((produto) => produto.honorarios > 0 || produto.quantidade > 0 || produto.valorOs > 0)
+      .sort((a, b) => b.honorarios - a.honorarios);
+
+    const caixaAtual = totalAtual || totais.honorariosAtualComparacao || 0;
+    const caixaProjetado = planoCompetencia?.projecao || caixaAtual;
+    const metaCaixa = planoCompetencia?.meta || caixaAtual * (1 + (dadosAtuais.comparacao?.metaCrescimento || 0.3));
+    const gapCaixa = Math.max(0, metaCaixa - caixaProjetado);
+    const reservaMinima = Math.max(metaCaixa * 0.15, (caixaProjetado / 30) * 7);
+    const concentracaoTop3 = caixaAtual ? produtos.slice(0, 3).reduce((total, produto) => total + produto.honorarios, 0) / caixaAtual : 0;
+    const margemMedia = valorOsDisponivel && totalValorOs ? caixaAtual / totalValorOs : 0;
+    const status: RadarStatus =
+      gapCaixa > metaCaixa * 0.12 || produtos.some((produto) => produto.status === "critico")
+        ? "critico"
+        : gapCaixa > 0 || concentracaoTop3 > 0.62
+          ? "alerta"
+          : "bom";
+    const produtoMotor = produtos[0];
+    const produtoRisco = produtos.find((produto) => produto.status === "critico") || produtos.find((produto) => produto.tendencia !== null && produto.tendencia < 0);
+    const diagnostico =
+      status === "critico"
+        ? `Caixa pede defesa: recuperar ${produtoRisco?.servico || "produto em queda"} e proteger o motor ${produtoMotor?.servico || "principal"}.`
+        : status === "alerta"
+          ? `Caixa perto do trilho, mas com gap ou concentracao. O top 3 representa ${formatarPercentual(concentracaoTop3)} do caixa atual.`
+          : `Arquitetura saudavel: caixa distribuido, motor definido e margem sob controle.`;
+    const comando =
+      status === "critico"
+        ? "Congelar dispersao, recuperar produto em queda, auditar margem e cobrar entrada diaria."
+        : status === "alerta"
+          ? "Reforcar produto lider, criar reserva minima e reduzir dependencia do top 3."
+          : "Manter rotina de caixa, repetir produto vencedor e reservar antes de expandir.";
+    const arquitetura: PlanoFinanceiro["arquitetura"] = [
+      {
+        bloco: "Caixa atual",
+        valor: moeda.format(caixaAtual),
+        detalhe: periodoAtual.label,
+        status: caixaAtual >= metaCaixa ? "bom" : "alerta",
+      },
+      {
+        bloco: "Caixa projetado",
+        valor: moeda.format(caixaProjetado),
+        detalhe: planoCompetencia?.emAndamento ? "ritmo ate fechamento" : "base reconhecida",
+        status: caixaProjetado >= metaCaixa ? "bom" : caixaProjetado >= metaCaixa * 0.88 ? "alerta" : "critico",
+      },
+      {
+        bloco: "Reserva minima",
+        valor: moeda.format(reservaMinima),
+        detalhe: "15% da meta ou 7 dias de caixa",
+        status: "alerta",
+      },
+      {
+        bloco: "Concentracao top 3",
+        valor: formatarPercentual(concentracaoTop3),
+        detalhe: "risco de dependencia",
+        status: concentracaoTop3 > 0.7 ? "critico" : concentracaoTop3 > 0.55 ? "alerta" : "bom",
+      },
+      {
+        bloco: "Margem media",
+        valor: valorOsDisponivel ? formatarPercentual(margemMedia) : "Indisponivel",
+        detalhe: valorOsDisponivel ? "honorarios / Valor O.S." : "PDF sem Valor O.S.",
+        status: !valorOsDisponivel ? "alerta" : margemMedia >= 0.12 ? "bom" : margemMedia >= 0.08 ? "alerta" : "critico",
+      },
+      {
+        bloco: "Ticket por O.S.",
+        valor: moeda.format(ticketMedio),
+        detalhe: `${numero.format(totalQuantidade)} O.S. no periodo`,
+        status: ticketMedio >= 100 ? "bom" : ticketMedio >= 70 ? "alerta" : "critico",
+      },
+    ];
+    const rotinas: PlanoFinanceiro["rotinas"] = [
+      {
+        janela: "Diario",
+        rotina: "Fechamento de caixa",
+        numero: moeda.format(Math.max(0, metaCaixa / Math.max(1, planoCompetencia?.diasNoMes || 30))),
+        decisao: "Comparar entrada do dia com o numero alvo e registrar qual produto trouxe caixa.",
+        status: gapCaixa ? "alerta" : "bom",
+      },
+      {
+        janela: "Semanal",
+        rotina: "Comite de produtos",
+        numero: produtoMotor?.servico || "produto lider",
+        decisao: "Proteger motor de caixa e escolher um produto de escala para campanha.",
+        status: "bom",
+      },
+      {
+        janela: "48h",
+        rotina: "Auditoria de margem",
+        numero: `${qualidadeLeitura.auditoriasReais.length} ponto(s)`,
+        decisao: "Revisar produtos fora da faixa antes de aceitar a previsao de caixa.",
+        status: qualidadeLeitura.auditoriasReais.length >= 6 ? "critico" : qualidadeLeitura.auditoriasReais.length ? "alerta" : "bom",
+      },
+      {
+        janela: "Mensal",
+        rotina: "Reserva e reinvestimento",
+        numero: moeda.format(reservaMinima),
+        decisao: "Separar reserva antes de aumentar campanha, desconto ou custo fixo.",
+        status: "alerta",
+      },
+    ];
+
+    return {
+      status,
+      diagnostico,
+      comando,
+      caixaAtual,
+      caixaProjetado,
+      metaCaixa,
+      gapCaixa,
+      reservaMinima,
+      concentracaoTop3,
+      margemMedia,
+      ticketMedio,
+      produtos,
+      arquitetura,
+      rotinas,
+      grafico: produtos.slice(0, 8).map((produto) => ({
+        produto: limitarTexto(produto.servico, 18),
+        caixa: produto.honorarios,
+        margem: produto.margem,
+        participacao: produto.participacao,
+      })),
+    };
+  }, [
+    dadosAtuais,
+    planoCompetencia,
+    qualidadeLeitura.auditoriasReais.length,
+    relatorioUpload,
+    totais.honorariosAtualComparacao,
+    valorOsDisponivel,
+  ]);
+
   const metasDinamicas = useMemo<MetaDinamica[]>(() => {
     if (!relatorioUpload) return [];
 
@@ -3345,7 +4688,7 @@ export default function AnaliseHonorariosPage() {
         tema: "Previsao",
         padrao: planoCompetencia?.emAndamento
           ? `${planoCompetencia.diasCobertos}/${planoCompetencia.diasNoMes} dias reconhecidos em ${planoCompetencia.label}.`
-          : `Base robusta formada por ${planoCompetencia?.periodosBase.join(", ") || "competencias fechadas"}.`,
+          : `Base da meta formada por ${planoCompetencia?.periodosBase.join(", ") || "competencias fechadas"}.`,
         impacto: `Projecao para ${planoCompetencia?.label || "proxima competencia"}: ${moeda.format(analisePreditiva.previsaoProximo)} em honorarios.`,
         recomendacao: "Comparar semanalmente contra a meta e agir antes do fechamento se a curva ficar abaixo do alvo.",
       },
@@ -3530,7 +4873,7 @@ export default function AnaliseHonorariosPage() {
     if (!comparacaoSuficiente || !planoCompetencia) return null;
 
     const alvo = planoCompetencia.meta;
-    const falta = planoCompetencia.gap;
+    const falta = gapOperacionalCompetencia;
     const progresso = limitarScore(planoCompetencia.emAndamento ? planoCompetencia.progresso : planoCompetencia.progressoProjetado);
     const diferencaQuantidade = (comparacaoOrganica.ultimo?.quantidade || 0) - (comparacaoOrganica.primeiro?.quantidade || 0);
     const diferencaMedia = (comparacaoOrganica.ultimo?.honorarioMedio || 0) - (comparacaoOrganica.primeiro?.honorarioMedio || 0);
@@ -3573,7 +4916,7 @@ export default function AnaliseHonorariosPage() {
       baseLabel: planoCompetencia.origemMeta,
       atualLabel: planoCompetencia.label,
     };
-  }, [comparacaoOrganica, comparacaoSuficiente, planoCompetencia, totais.servicoLider.servico]);
+  }, [comparacaoOrganica, comparacaoSuficiente, gapOperacionalCompetencia, planoCompetencia, totais.servicoLider.servico]);
 
   const diagnosticoGanhos = useMemo(() => {
     const piorServico = [...dadosAtuais.servicos]
@@ -3715,75 +5058,189 @@ export default function AnaliseHonorariosPage() {
         <Printer size={17} />
         <span>Imprimir esta aba</span>
       </button>
+      {relatorioUpload && (
+        <small>
+          Filtro: {contextoAnalise.recorteLabel}; {contextoAnalise.filtroServicos}. Meta:{" "}
+          {planoCompetencia?.label || "sem competencia"}.
+          {previsaoCampo ? ` Campo: ${previsaoCampo.periodoBase}.` : ""}
+        </small>
+      )}
     </div>
   );
 
   return (
-      <main className={styles.page} data-print-scope={escopoImpressao || undefined}>
-        <nav className={styles.modeTabs} aria-label="Modos da pagina de analise">
-          <button type="button" className={modoAnalise === "honorarios" ? styles.modeActive : ""} onClick={() => setModoAnalise("honorarios")}>
-            <BarChart3 size={19} />
+    <main className={styles.page} data-print-scope={escopoImpressao || undefined}>
+
+      {/* Hidden file inputs */}
+      <input
+        id="analise-arquivos-input"
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,image/*"
+        multiple
+        className={styles.fileInput}
+        onChange={handleArquivos}
+      />
+      <input
+        id="analise-lote-input"
+        ref={(node) => {
+          loteInputRef.current = node;
+          node?.setAttribute("webkitdirectory", "");
+        }}
+        type="file"
+        accept="application/pdf,image/*"
+        multiple
+        className={styles.fileInput}
+        onChange={handleLoteArquivos}
+      />
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+      )}
+
+      {/* ── Sidebar ── */}
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}>
+        <div className={styles.sidebarHeader}>
+          <div className={styles.sidebarBrand}>
+            <BarChart3 size={22} />
+            <span>Eny <strong>Analise</strong></span>
+          </div>
+          <button className={styles.sidebarClose} onClick={() => setSidebarOpen(false)} aria-label="Fechar menu">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Mode toggle */}
+        <div className={styles.sidebarModeToggle}>
+          <button
+            type="button"
+            className={`${styles.sidebarModeBtn} ${modoAnalise === "honorarios" ? styles.sidebarModeBtnActive : ""}`}
+            onClick={() => { setModoAnalise("honorarios"); setSidebarOpen(false); }}
+          >
+            <BarChart3 size={15} />
             <span>Honorarios</span>
           </button>
-          <button type="button" className={modoAnalise === "dados-locais" ? styles.modeActive : ""} onClick={() => setModoAnalise("dados-locais")}>
-            <Database size={19} />
+          <button
+            type="button"
+            className={`${styles.sidebarModeBtn} ${modoAnalise === "dados-locais" ? styles.sidebarModeBtnActive : ""}`}
+            onClick={() => { setModoAnalise("dados-locais"); setSidebarOpen(false); }}
+          >
+            <Database size={15} />
             <span>Dados locais</span>
           </button>
-          <div className={styles.sidebarDocumentCard}>
-            <strong>Documentos da analise</strong>
-            {relatorioUpload && <small>Usando: {relatorioUpload.arquivos.join(", ")}</small>}
-            {statusUpload && <small className={styles.uploadOk}>{statusUpload}</small>}
-            {erroUpload && <small className={styles.uploadError}>{erroUpload}</small>}
-            <input
-              id="analise-arquivos-input"
-              ref={inputRef}
-              type="file"
-              accept="application/pdf,image/*"
-              multiple
-              className={styles.fileInput}
-              onChange={handleArquivos}
-            />
-            <input
-              id="analise-lote-input"
-              ref={(node) => {
-                loteInputRef.current = node;
-                node?.setAttribute("webkitdirectory", "");
-              }}
-              type="file"
-              accept="application/pdf,image/*"
-              multiple
-              className={styles.fileInput}
-              onChange={handleLoteArquivos}
-            />
-            <button className={styles.printButton} type="button" onClick={() => window.print()}>
-              <Printer size={17} />
-              <span>Imprimir relatorio</span>
-            </button>
+          <button
+            type="button"
+            className={`${styles.sidebarModeBtn} ${modoAnalise === "sgdw" ? styles.sidebarModeBtnActive : ""}`}
+            onClick={() => { setModoAnalise("sgdw"); setSidebarOpen(false); }}
+          >
+            <Wifi size={15} />
+            <span>SGDW</span>
+          </button>
+        </div>
+
+        {/* Nav items */}
+        {modoAnalise === "honorarios" && (
+          <nav className={styles.sidebarNav} aria-label="Abas da analise">
+            {abas.map((aba) => (
+              <button
+                key={aba.id}
+                type="button"
+                className={`${styles.sidebarNavItem} ${abaAtiva === aba.id ? styles.sidebarNavActive : ""}`}
+                onClick={() => { setAbaAtiva(aba.id); setSidebarOpen(false); }}
+              >
+                <span className={styles.sidebarNavIcon}>{aba.icon}</span>
+                <span className={styles.sidebarNavLabel}>{aba.label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
+
+        {/* Upload in sidebar footer */}
+        <div className={styles.sidebarFooter}>
+          {relatorioUpload && (
+            <div className={styles.sidebarFileBadge}>
+              <CheckCircle2 size={13} />
+              <span>{relatorioUpload.arquivos.length} arquivo(s)</span>
+            </div>
+          )}
+          {erroUpload && <div className={styles.sidebarErrBadge}><span>{erroUpload}</span></div>}
+          <button
+            type="button"
+            className={styles.sidebarUploadBtn}
+            onClick={() => { abrirSeletorArquivo(inputRef, "analise-arquivos-input"); setSidebarOpen(false); }}
+            disabled={processando}
+          >
+            <Layers size={15} />
+            {processando ? "Processando..." : relatorioUpload ? "Adicionar" : "Anexar PDFs"}
+          </button>
+          <div className={styles.sidebarUploadRow}>
             <button
               type="button"
-              className={styles.attachButton}
+              className={styles.sidebarGhostBtn}
+              onClick={() => { abrirSeletorArquivo(loteInputRef, "analise-lote-input"); setSidebarOpen(false); }}
+              disabled={processando}
+              title="Importar pasta"
+            >
+              <Database size={14} />
+              <span>Lote</span>
+            </button>
+            {relatorioUpload && (
+              <button type="button" className={styles.sidebarGhostBtn} onClick={handleLimparAnalise} disabled={processando}>
+                Limpar
+              </button>
+            )}
+            <button className={styles.sidebarGhostBtn} type="button" onClick={() => window.print()} title="Imprimir">
+              <Printer size={14} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Main area ── */}
+      <div className={styles.mainArea}>
+
+        {/* Glass header */}
+        <header className={styles.glassHeader}>
+          <button
+            type="button"
+            className={styles.hamburgerBtn}
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir menu"
+          >
+            <Menu size={20} />
+          </button>
+
+          <div className={styles.glassHeaderBrand}>
+            <BarChart3 size={18} />
+            <span>Eny <strong>Analise</strong></span>
+          </div>
+
+          {/* Status badges visible on header */}
+          <div className={styles.glassHeaderActions}>
+            {statusUpload && !relatorioUpload && <span className={styles.headerStatusOk}>{statusUpload}</span>}
+            {relatorioUpload && (
+              <span className={styles.headerFileBadge}>
+                <CheckCircle2 size={13} />
+                {relatorioUpload.arquivos.length} arquivo(s)
+              </span>
+            )}
+            <button
+              type="button"
+              className={styles.headerBtnPrimary}
               onClick={() => abrirSeletorArquivo(inputRef, "analise-arquivos-input")}
               disabled={processando}
             >
-              {processando ? "Processando..." : "Anexar arquivos"}
+              <Layers size={15} />
+              <span>{processando ? "Processando..." : relatorioUpload ? "Adicionar" : "Anexar PDFs"}</span>
             </button>
-            <button
-              type="button"
-              className={styles.batchButton}
-              onClick={() => abrirSeletorArquivo(loteInputRef, "analise-lote-input")}
-              disabled={processando}
-            >
-              <Layers size={17} />
-              {processando ? "Processando lote..." : "Anexar pasta/lote"}
+            <button className={styles.headerBtnGhost} type="button" onClick={() => window.print()} title="Imprimir">
+              <Printer size={15} />
             </button>
-            {relatorioUpload && (
-              <button type="button" className={styles.secondaryButton} onClick={handleLimparAnalise} disabled={processando}>
-                Limpar analise
-              </button>
-            )}
           </div>
-        </nav>
+        </header>
 
+        <div className={styles.pageBody}>
         {modoAnalise === "dados-locais" && (
           <DadosLocaisConteudo
             dados={dadosLocais}
@@ -3798,6 +5255,8 @@ export default function AnaliseHonorariosPage() {
           />
         )}
 
+        {modoAnalise === "sgdw" && <SgdwModo />}
+
         <div className={modoAnalise === "honorarios" ? "" : styles.modeHidden}>
         <section className={`${styles.topPanel} ${relatorioUpload ? "" : styles.topPanelEmpty}`}>
           <div className={styles.topIntro}>
@@ -3809,28 +5268,62 @@ export default function AnaliseHonorariosPage() {
           </div>
           {relatorioUpload && (
             <div className={styles.topMetric}>
-              <span>{leituraDinamica.periodoDocumentoTexto}</span>
+              <span>{contextoAnalise.topoTitulo}</span>
               <strong>
-                {comparacaoSuficiente
+                {contextoAnalise.multiperiodo
+                  ? moeda.format(totais.honorariosRecorte)
+                  : comparacaoSuficiente
                   ? moeda.format(totais.ganhoIncremental)
                   : periodoUnico
                   ? moeda.format(totais.honorariosAtualComparacao)
                   : `${mesesBaseComparacao}/${MIN_PERIODOS_COMPARACAO}`}
               </strong>
-              <small>{leituraDinamica.resultadoLabel} no fechamento {leituraDinamica.fechamentoTexto}</small>
+              <small>
+                {contextoAnalise.multiperiodo
+                  ? `${leituraDinamica.resultadoLabel}. ${contextoAnalise.topoDetalhe}`
+                  : `${leituraDinamica.resultadoLabel} no fechamento ${leituraDinamica.fechamentoTexto}`}
+              </small>
             </div>
           )}
         </section>
 
         {!relatorioUpload && (
-          <section className={styles.panel}>
-            <div className={styles.panelHeader}>
-              <ClipboardList size={20} />
-              <h2>Aguardando documentos</h2>
+          <section
+            className={styles.uploadZone}
+            onClick={() => !processando && abrirSeletorArquivo(inputRef, "analise-arquivos-input")}
+          >
+            <div className={styles.uploadZoneIcon}>
+              <Layers size={30} />
             </div>
+            <h2>Envie seus documentos para comecar</h2>
             <p>
-              Anexe PDFs fonte, PDFs de diferenca mes ou imagens para gerar resumo, graficos, metas, auditoria, previsao e proximos passos com base nos documentos enviados.
+              Anexe PDFs de honorarios, PDFs de diferenca mes ou imagens escaneadas. O sistema gera comparativo, graficos, metas, auditoria e previsao automaticamente.
             </p>
+            <div className={styles.uploadZoneButtons}>
+              <button
+                type="button"
+                className={styles.attachButton}
+                onClick={(e) => { e.stopPropagation(); abrirSeletorArquivo(inputRef, "analise-arquivos-input"); }}
+                disabled={processando}
+              >
+                Selecionar arquivos (PDF / imagem)
+              </button>
+              <button
+                type="button"
+                className={styles.batchButton}
+                onClick={(e) => { e.stopPropagation(); abrirSeletorArquivo(loteInputRef, "analise-lote-input"); }}
+                disabled={processando}
+              >
+                <Layers size={16} />
+                Importar pasta inteira
+              </button>
+            </div>
+            <div className={styles.uploadZoneHint}>
+              <span><CheckCircle2 size={13} /> PDFs de honorarios</span>
+              <span><CheckCircle2 size={13} /> Comparativo mes a mes</span>
+              <span><CheckCircle2 size={13} /> Imagens escaneadas</span>
+              <span><CheckCircle2 size={13} /> Multiplos arquivos</span>
+            </div>
           </section>
         )}
 
@@ -3856,6 +5349,23 @@ export default function AnaliseHonorariosPage() {
                 >
                   <strong>{recorte.label}</strong>
                   <small>{recorte.tipo === "todos" ? "Visao completa" : recorte.detalhe}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={styles.serviceSelectWrap}>
+            <span>Meta da competencia</span>
+            <div className={styles.periodButtonGroup} role="group" aria-label="Escolher competencia da meta">
+              {opcoesModoMeta.map((opcao) => (
+                <button
+                  type="button"
+                  key={opcao.id}
+                  className={opcao.id === modoMetaCompetencia ? styles.periodButtonActive : ""}
+                  aria-pressed={opcao.id === modoMetaCompetencia}
+                  onClick={() => setModoMetaCompetencia(opcao.id)}
+                >
+                  <strong>{opcao.label}</strong>
+                  <small>{opcao.detalhe}</small>
                 </button>
               ))}
             </div>
@@ -3931,9 +5441,9 @@ export default function AnaliseHonorariosPage() {
             {!!termoBuscaServico && servicosFiltroEncontrados.length === 0 && (
               <small className={styles.serviceFilterHint}>Nenhum servico encontrado nessa busca.</small>
             )}
-            {!termoBuscaServico && servicosFiltro.length > servicosFiltroVisiveis.length && (
+            {!termoBuscaServico && servicosFiltro.length > 0 && (
               <small className={styles.serviceFilterHint}>
-                Mostrando os mais acessiveis primeiro. Use a busca para achar qualquer servico.
+                Todos os {servicosFiltro.length} servico(s) ativos estao disponiveis para selecao.
               </small>
             )}
             {!servicosFiltro.length && <small className={styles.serviceFilterHint}>Sem servicos detalhados.</small>}
@@ -3943,12 +5453,18 @@ export default function AnaliseHonorariosPage() {
         {planoCompetencia && (
           <section className={`${styles.monthlyStatusPanel} ${statusClasse(planoCompetencia.status)}`}>
             <div>
-              <span>Competencia inteligente</span>
+              <span>Meta escolhida</span>
               <strong>{planoCompetencia.label}</strong>
               <small>
                 {planoCompetencia.emAndamento
                   ? `Em andamento: ${planoCompetencia.diasCobertos}/${planoCompetencia.diasNoMes} dias reconhecidos.`
-                  : "Proxima competencia calculada somente com meses fechados."}
+                  : planoCompetencia.modo === "mes-anterior"
+                    ? "Competencia anterior fechada: base e historico, sem cobranca ativa."
+                    : planoCompetencia.realizado > 0
+                      ? "Competencia com dados — resultado real registrado."
+                      : planoCompetencia.modo === "proximo-mes"
+                        ? `Competencia futura sem dados — projecao evolutiva ${planoCompetencia.origemMeta.toLowerCase()}.`
+                        : "Competencia atual sem dados — projecao baseada no historico recente."}
               </small>
             </div>
             <div>
@@ -3957,30 +5473,64 @@ export default function AnaliseHonorariosPage() {
               <small>{planoCompetencia.origemMeta}</small>
             </div>
             <div>
-              <span>{planoCompetencia.emAndamento ? "Realizado / projecao" : "Projecao base"}</span>
+              <span>{planoCompetencia.emAndamento ? "Realizado / projecao" : competenciaMetaFechada ? "Resultado fechado" : "Projecao base"}</span>
               <strong>
                 {planoCompetencia.emAndamento
                   ? `${moeda.format(planoCompetencia.realizado)} / ${moeda.format(planoCompetencia.projecao)}`
-                  : moeda.format(planoCompetencia.projecao)}
+                  : competenciaMetaFechada
+                    ? moeda.format(planoCompetencia.realizado)
+                    : moeda.format(planoCompetencia.projecao)}
               </strong>
-              <small>{planoCompetencia.statusLabel}</small>
+              <small>{competenciaMetaFechada ? "Mes passado preservado como referencia." : planoCompetencia.statusLabel}</small>
             </div>
           </section>
         )}
 
-        <nav className={styles.tabs} aria-label="Abas da analise">
-          {abas.map((aba) => (
-            <button
-              key={aba.id}
-              type="button"
-              className={`${styles.tabButton} ${abaAtiva === aba.id ? styles.tabActive : ""}`}
-              onClick={() => setAbaAtiva(aba.id)}
-            >
-              {aba.icon}
-              <span>{aba.label}</span>
-            </button>
-          ))}
-        </nav>
+        {organismoVivo && !["previsaoCampo", "metaAnual"].includes(abaAtiva) && (
+          <section className={`${styles.liveSystemPanel} ${statusClasse(organismoVivo.status)}`}>
+            <div className={styles.liveSystemHeader}>
+              <div>
+                <span>Leitura integrada</span>
+                <h2>Organismo vivo da operacao</h2>
+                <p>{organismoVivo.diagnostico}</p>
+              </div>
+              <div className={styles.liveSystemPulse}>
+                <span>Pulso atual</span>
+                <strong>{organismoVivo.pulso}</strong>
+                <small>{organismoVivo.comando}</small>
+              </div>
+            </div>
+
+            <div className={styles.liveSystemScoreboard}>
+              {organismoVivo.placar.map((item) => (
+                <div className={statusClasse(item.status)} key={item.label}>
+                  <span>{item.label}</span>
+                  <strong>{item.valor}</strong>
+                  <small>{item.detalhe}</small>
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.liveSystemLoop}>
+              {organismoVivo.ciclo.map((item) => (
+                <article className={statusClasse(item.status)} key={item.etapa}>
+                  <span>{item.etapa}</span>
+                  <div>
+                    <strong>{item.titulo}</strong>
+                    <small>{item.numero}</small>
+                    <p>{item.missao}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className={styles.liveSystemSignals}>
+              {organismoVivo.sinais.map((sinal) => (
+                <small key={sinal}>{sinal}</small>
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className={`${styles.tabContent} ${abaAtiva === "resumo" ? styles.tabVisible : ""}`} data-tab="resumo">
           <section className={styles.sectionStack} data-print-section="Resumo">
@@ -3991,8 +5541,8 @@ export default function AnaliseHonorariosPage() {
                   <span>{!valorOsDisponivel && item.indicador === "Quantidade total" ? "Total de O.S." : item.indicador}</span>
                   <strong>{formatarValor(item.valor2026, item.tipo)}</strong>
                   <div>
-                    {comparacaoMensal ? (
-                      <small>{!valorOsDisponivel && item.indicador === "Quantidade total" ? "Volume identificado nos meses do PDF" : `Total dos ${periodosAnalisados.length} meses enviados`}</small>
+                    {comparacaoMensal || (!comparacaoMensal && item.valor2025 === 0) ? (
+                      <small>{!valorOsDisponivel && item.indicador === "Quantidade total" ? "Volume identificado nos meses do PDF" : comparacaoMensal ? `Total dos ${periodosAnalisados.length} meses enviados` : "Periodo unico selecionado"}</small>
                     ) : (
                       <>
                         <small>{dadosAtuais.comparacao?.anteriorLabel}: {formatarValor(item.valor2025, item.tipo)}</small>
@@ -4331,14 +5881,18 @@ export default function AnaliseHonorariosPage() {
               <div>
                 <span>Comparacao adaptativa</span>
                 <h2>
-                  {comparacaoSuficiente
+                  {contextoAnalise.multiperiodo
+                    ? "Todos os periodos do filtro"
+                    : comparacaoSuficiente
                     ? "Diferenca dos periodos"
                     : comparacaoBloqueadaPorBase
                     ? "Base minima pendente"
                     : "Retrato do periodo"}
                 </h2>
                 <p>
-                  {comparacaoSuficiente
+                  {contextoAnalise.multiperiodo
+                    ? `Usando ${contextoAnalise.labels.length} periodo(s), ${contextoAnalise.filtroServicos}. O resumo considera o total acumulado; os passos mostram mes contra mes.`
+                    : comparacaoSuficiente
                     ? "Fechamento, transicoes entre anexos e servicos que mudaram o resultado."
                     : comparacaoBloqueadaPorBase
                     ? `A comparacao exige ${MIN_PERIODOS_COMPARACAO} periodos ou mais; os periodos reconhecidos ficam listados abaixo.`
@@ -4351,33 +5905,71 @@ export default function AnaliseHonorariosPage() {
               comparacaoOrganica.fechamento ? (
                 <div className={styles.comparisonSummary}>
                   <div className={styles.comparisonRange}>
-                    <strong>{comparacaoOrganica.primeiro.label}</strong>
-                    {comparacaoOrganica.passos.length > 0 && (
+                    {contextoAnalise.multiperiodo ? (
                       <>
-                        <ArrowLeftRight size={18} />
-                        <strong>{comparacaoOrganica.ultimo.label}</strong>
+                        {comparacaoOrganica.periodosImportados.map((periodo, index) => (
+                          <React.Fragment key={`range-${periodo.label}`}>
+                            {index > 0 && <ArrowLeftRight size={16} />}
+                            <strong>{periodo.label}</strong>
+                          </React.Fragment>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        <strong>{comparacaoOrganica.primeiro.label}</strong>
+                        {comparacaoOrganica.passos.length > 0 && (
+                          <>
+                            <ArrowLeftRight size={18} />
+                            <strong>{comparacaoOrganica.ultimo.label}</strong>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
                   <div className={styles.comparisonMetricGrid}>
                     <div>
-                      <span>Honorarios</span>
-                      <strong className={comparacaoOrganica.passos.length && comparacaoOrganica.fechamento.diferencaHonorarios < 0 ? styles.negative : styles.positive}>
-                        {moeda.format(comparacaoOrganica.passos.length ? comparacaoOrganica.fechamento.diferencaHonorarios : comparacaoOrganica.ultimo.honorarios)}
+                      <span>{contextoAnalise.multiperiodo ? "Honorarios no recorte" : "Honorarios"}</span>
+                      <strong className={comparacaoOrganica.passos.length && comparacaoOrganica.fechamento.diferencaHonorarios < 0 && !contextoAnalise.multiperiodo ? styles.negative : styles.positive}>
+                        {moeda.format(
+                          contextoAnalise.multiperiodo
+                            ? totais.honorariosRecorte
+                            : comparacaoOrganica.passos.length
+                              ? comparacaoOrganica.fechamento.diferencaHonorarios
+                              : comparacaoOrganica.ultimo.honorarios
+                        )}
                       </strong>
-                      <small>{comparacaoOrganica.passos.length ? formatarPercentual(comparacaoOrganica.fechamento.variacaoHonorarios) : "Valor lido no anexo"}</small>
+                      <small>
+                        {contextoAnalise.multiperiodo
+                          ? `Extremos: ${moeda.format(comparacaoOrganica.fechamento.diferencaHonorarios)} (${formatarPercentual(comparacaoOrganica.fechamento.variacaoHonorarios)})`
+                          : comparacaoOrganica.passos.length
+                            ? formatarPercentual(comparacaoOrganica.fechamento.variacaoHonorarios)
+                            : "Valor lido no anexo"}
+                      </small>
                     </div>
                     <div>
-                      <span>{valorOsDisponivel ? "Quantidade" : "Total de O.S."}</span>
-                      <strong className={comparacaoOrganica.passos.length && comparacaoOrganica.fechamento.diferencaQuantidade < 0 ? styles.negative : styles.positive}>
-                        {numero.format(comparacaoOrganica.passos.length ? comparacaoOrganica.fechamento.diferencaQuantidade : comparacaoOrganica.ultimo.quantidade)}
+                      <span>{contextoAnalise.multiperiodo ? "O.S. no recorte" : valorOsDisponivel ? "Quantidade" : "Total de O.S."}</span>
+                      <strong className={comparacaoOrganica.passos.length && comparacaoOrganica.fechamento.diferencaQuantidade < 0 && !contextoAnalise.multiperiodo ? styles.negative : styles.positive}>
+                        {numero.format(
+                          contextoAnalise.multiperiodo
+                            ? totais.quantidadeRecorte
+                            : comparacaoOrganica.passos.length
+                              ? comparacaoOrganica.fechamento.diferencaQuantidade
+                              : comparacaoOrganica.ultimo.quantidade
+                        )}
                       </strong>
-                      <small>{comparacaoOrganica.passos.length ? formatarPercentual(comparacaoOrganica.fechamento.variacaoQuantidade) : "Volume importado"}</small>
+                      <small>
+                        {contextoAnalise.multiperiodo
+                          ? `Extremos: ${numero.format(comparacaoOrganica.fechamento.diferencaQuantidade)} (${formatarPercentual(comparacaoOrganica.fechamento.variacaoQuantidade)})`
+                          : comparacaoOrganica.passos.length
+                            ? formatarPercentual(comparacaoOrganica.fechamento.variacaoQuantidade)
+                            : "Volume importado"}
+                      </small>
                     </div>
                     <div>
-                      <span>{valorOsDisponivel ? "Valor O.S." : "Honorario medio/O.S."}</span>
+                      <span>{contextoAnalise.multiperiodo ? (valorOsDisponivel ? "Valor O.S. no recorte" : "Media/O.S. atual") : valorOsDisponivel ? "Valor O.S." : "Honorario medio/O.S."}</span>
                       <strong
                         className={
+                          contextoAnalise.multiperiodo ||
                           !comparacaoOrganica.passos.length ||
                           (valorOsDisponivel
                             ? comparacaoOrganica.fechamento.diferencaValorOs
@@ -4387,7 +5979,11 @@ export default function AnaliseHonorariosPage() {
                         }
                       >
                         {moeda.format(
-                          comparacaoOrganica.passos.length
+                          contextoAnalise.multiperiodo
+                            ? valorOsDisponivel
+                              ? totais.valorOsRecorte
+                              : comparacaoOrganica.ultimo.honorarioMedio
+                            : comparacaoOrganica.passos.length
                             ? valorOsDisponivel
                               ? comparacaoOrganica.fechamento.diferencaValorOs
                               : comparacaoOrganica.fechamento.diferencaHonorarioMedio
@@ -4397,7 +5993,11 @@ export default function AnaliseHonorariosPage() {
                         )}
                       </strong>
                       <small>
-                        {comparacaoOrganica.passos.length
+                        {contextoAnalise.multiperiodo
+                          ? valorOsDisponivel
+                            ? `Extremos: ${moeda.format(comparacaoOrganica.fechamento.diferencaValorOs)}`
+                            : `Ultimo periodo: ${comparacaoOrganica.ultimo.label}`
+                          : comparacaoOrganica.passos.length
                           ? formatarPercentual(
                               valorOsDisponivel
                                 ? comparacaoOrganica.fechamento.variacaoValorOs
@@ -4435,21 +6035,33 @@ export default function AnaliseHonorariosPage() {
                 <p>
                   {comparacaoBloqueadaPorBase
                     ? `${comparacaoOrganica.periodosImportados.length} periodo(s) entraram na leitura. A comparacao libera com ${MIN_PERIODOS_COMPARACAO} periodos ou mais.`
-                    : `${comparacaoOrganica.periodosImportados.length} periodo(s) entraram na leitura. O fechamento resume o primeiro contra o ultimo; cada transicao disponivel aparece logo abaixo.`}
+                    : contextoAnalise.multiperiodo
+                      ? `${comparacaoOrganica.periodosImportados.length} periodo(s) entraram na leitura e todos entram nos totais, graficos e historico. O quadro de extremos e apenas um resumo rapido.`
+                      : `${comparacaoOrganica.periodosImportados.length} periodo(s) entraram na leitura. Cada transicao disponivel aparece logo abaixo.`}
                 </p>
                 <div className={styles.comparisonPeriodRail}>
-                  {comparacaoOrganica.periodosImportados.map((periodo, index) => (
-                    <div key={`periodo-comparacao-${periodo.label}`}>
-                      <span>{index === 0 ? "Inicio" : index === comparacaoOrganica.periodosImportados.length - 1 ? "Fim" : `Passagem ${index}`}</span>
-                      <strong>{periodo.label}</strong>
-                      <small>{moeda.format(periodo.honorarios)} honorarios</small>
-                      <small>{numero.format(periodo.quantidade)} {valorOsDisponivel ? "processos" : "O.S."}</small>
-                      <small>
-                        Corte: {periodo.intervalos?.length ? periodo.intervalos.map((intervalo) => intervalo.label).join(" / ") : "nao informado"}
-                      </small>
-                      {!!periodo.arquivos?.length && <small>Fonte(s): {periodo.arquivos.join(", ")}</small>}
-                    </div>
-                  ))}
+                  {comparacaoOrganica.periodosImportados.map((periodo, index) => {
+                    const ehAnual = (periodo.intervalos ?? []).some(
+                      (iv) => iv.mesNumero !== iv.mesFinal && iv.mesFinal - iv.mesNumero >= 2
+                    );
+                    return (
+                      <div key={`periodo-comparacao-${periodo.label}`}>
+                        <span>{index === 0 ? "Inicio" : index === comparacaoOrganica.periodosImportados.length - 1 ? "Fim" : `Passagem ${index}`}</span>
+                        <strong>{periodo.label}</strong>
+                        <small>{moeda.format(periodo.honorarios)} honorarios</small>
+                        <small>{numero.format(periodo.quantidade)} {valorOsDisponivel ? "processos" : "O.S."}</small>
+                        <small>
+                          Corte: {periodo.intervalos?.length ? periodo.intervalos.map((intervalo) => intervalo.label).join(" / ") : "nao informado"}
+                        </small>
+                        {!!periodo.arquivos?.length && <small>Fonte(s): {periodo.arquivos.join(", ")}</small>}
+                        {ehAnual && (
+                          <small style={{ color: "#b07020", fontWeight: 600 }}>
+                            Relatorio anual parcial — o PDF contem apenas as paginas lidas. O valor exibido e a soma dos servicos encontrados, nao o total consolidado do ano.
+                          </small>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </article>
             )}
@@ -4704,10 +6316,14 @@ export default function AnaliseHonorariosPage() {
                 <article className={`${styles.panel} ${styles.comparisonClosingTable}`}>
                   <div className={styles.panelHeader}>
                     <ArrowLeftRight size={20} />
-                    <h2>Fechamento: {comparacaoOrganica.primeiro?.label || "Anterior"} x {comparacaoOrganica.ultimo?.label || "Atual"}</h2>
+                    <h2>
+                      {contextoAnalise.multiperiodo ? "Resumo dos extremos" : "Fechamento"}: {comparacaoOrganica.primeiro?.label || "Anterior"} x {comparacaoOrganica.ultimo?.label || "Atual"}
+                    </h2>
                   </div>
                   <p>
-                    Resume a virada do primeiro para o ultimo periodo. Quando existem meses intermediarios, o historico completo preserva cada coluna.
+                    {contextoAnalise.multiperiodo
+                      ? `Este quadro compara apenas o primeiro e o ultimo periodo. A leitura completa continua usando ${contextoAnalise.labels.length} periodo(s): ${contextoAnalise.trilhaCompleta}.`
+                      : "Resume a virada do periodo anterior para o atual."}
                   </p>
                   <div className={styles.tableWrap}>
                     <table className={styles.table}>
@@ -4755,7 +6371,7 @@ export default function AnaliseHonorariosPage() {
                   <h2>Historico completo por servico</h2>
                 </div>
                 <p>
-                  Mostra cada periodo reconhecido. Assim, envios com meses soltos exibem cada coluna e a diferenca do primeiro para o ultimo.
+                  Mostra cada periodo reconhecido no filtro ativo. Assim, envios com varios meses exibem cada coluna e continuam respondendo aos filtros de periodo e servico.
                 </p>
                 <div className={styles.tableWrap}>
                   <table className={`${styles.table} ${styles.comparisonHistoryTable}`}>
@@ -4837,7 +6453,7 @@ export default function AnaliseHonorariosPage() {
               <>
                 <article className={`${styles.pnvaCoreHero} ${statusClasse(planoPnvaCore.status)}`}>
                   <div>
-                    <span>Metodo Gustavo Martins</span>
+                    <span>Plano dinamico</span>
                     <h2>Plano de acao da semana</h2>
                     <p>{planoPnvaCore.decisao}</p>
                   </div>
@@ -4911,6 +6527,436 @@ export default function AnaliseHonorariosPage() {
                   </article>
                 </div>
               </>
+            )}
+          </section>
+        </div>
+
+        <div className={`${styles.tabContent} ${abaAtiva === "previsaoCampo" ? styles.tabVisible : ""}`} data-tab="previsaoCampo">
+          <section className={styles.sectionStack} data-print-section="Previsao de campo">
+            {botaoImprimirAba("previsaoCampo")}
+            {previsaoCampo ? (
+              <>
+                <article className={`${styles.fieldSimpleHero} ${statusClasse(previsaoCampo.status)}`}>
+                  <div>
+                    <span>Previsao simples</span>
+                    <h2>
+                      {previsaoCampo.status === "bom"
+                        ? "No ritmo atual, da para bater a meta."
+                        : previsaoCampo.status === "alerta"
+                          ? "Esta perto, mas precisa acompanhar todo dia."
+                          : "Esta abaixo da meta e precisa recuperar caixa."}
+                    </h2>
+                    <p>{previsaoCampo.diagnostico}</p>
+                  </div>
+                  <div className={styles.fieldSimpleCommand}>
+                    <span>O que fazer agora</span>
+                    <strong>{previsaoCampo.decisao}</strong>
+                  </div>
+                </article>
+
+                <div className={styles.fieldAnswerGrid}>
+                  <article className={`${styles.fieldAnswerCard} ${statusClasse(previsaoCampo.status)}`}>
+                    <span>Quanto deve entrar no ano</span>
+                    <strong>{moeda.format(previsaoCampo.previsaoAno)}</strong>
+                    <small>Base lida: {previsaoCampo.periodoBase}. Padrao: {previsaoCampo.padrao}.</small>
+                  </article>
+                  <article className={`${styles.fieldAnswerCard} ${previsaoCampo.gapAno ? styles.statusAlerta : styles.statusBom}`}>
+                    <span>Meta do ano</span>
+                    <strong>{moeda.format(previsaoCampo.metaAno)}</strong>
+                    <small>Numero que precisa ser alcancado.</small>
+                  </article>
+                  <article className={`${styles.fieldAnswerCard} ${previsaoCampo.gapAno ? styles.statusAlerta : styles.statusBom}`}>
+                    <span>Quanto falta</span>
+                    <strong>{moeda.format(previsaoCampo.gapAno)}</strong>
+                    <small>{previsaoCampo.gapAno ? "Esse valor precisa virar venda." : "Sem falta prevista hoje."}</small>
+                  </article>
+                  <article className={`${styles.fieldAnswerCard} ${previsaoCampo.ritmoDiarioNecessario ? styles.statusAlerta : styles.statusBom}`}>
+                    <span>Meta por dia</span>
+                    <strong>{moeda.format(previsaoCampo.ritmoDiarioNecessario)}</strong>
+                    <small>{previsaoCampo.diasRestantes} dia(s) ate o fim do ano.</small>
+                  </article>
+                </div>
+
+                <div className={styles.fieldSimpleGrid}>
+                  <article className={styles.chartPanel}>
+                    <h2>Caminho ate dezembro</h2>
+                    <p>
+                      Verde e o que ja entrou. Azul e o que deve entrar se o ritmo continuar. Laranja e a meta do mes.
+                    </p>
+                    <ChartShell height={340}>
+                      <BarChart data={previsaoCampo.grafico}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="label" />
+                        <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                        <Bar dataKey="realizado" name="Realizado" fill="#1f9d72" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="previsto" name="Previsto" fill="#4666c9" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="meta" name="Meta mensal" fill="#d17a22" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ChartShell>
+                  </article>
+
+                  <article className={styles.fieldExplainPanel}>
+                    <div className={styles.panelHeader}>
+                      <BrainCircuit size={20} />
+                      <h2>Como ler sem conta dificil</h2>
+                    </div>
+                    <div className={styles.fieldExplainList}>
+                      {previsaoCampo.equacoes.map((equacao) => (
+                        <article className={statusClasse(equacao.status)} key={equacao.nome}>
+                          <span>{equacao.nome}</span>
+                          <strong>{equacao.resultado}</strong>
+                          <p>{equacao.formula}</p>
+                          <small>{equacao.leitura}</small>
+                        </article>
+                      ))}
+                    </div>
+                  </article>
+                </div>
+
+                <article className={styles.fieldActionPanel}>
+                  <div className={styles.panelHeader}>
+                    <Target size={20} />
+                    <h2>Plano facil de executar</h2>
+                  </div>
+                  <div className={styles.fieldActionList}>
+                    {previsaoCampo.missoes.map((missao, index) => (
+                      <article className={`${styles.fieldActionCard} ${statusClasse(missao.status)}`} key={missao.titulo}>
+                        <div>
+                          <span>{String(index + 1).padStart(2, "0")}</span>
+                        </div>
+                        <section>
+                          <span>{missao.titulo}</span>
+                          <strong>{missao.missao}</strong>
+                          <p>{missao.como}</p>
+                          <div>
+                            <small>{missao.indicador}</small>
+                            <small>{missao.prazo}</small>
+                          </div>
+                        </section>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+
+                <div className={styles.fieldStepGrid}>
+                  {previsaoCampo.roteiro.map((item) => (
+                    <article className={`${styles.fieldStepCard} ${statusClasse(item.status)}`} key={item.janela}>
+                      <div>
+                        <span className={item.status === "critico" ? styles.badgeHigh : styles.badgeMedium}>{item.janela}</span>
+                        <h2>{item.missao}</h2>
+                        <p>{item.execucao}</p>
+                      </div>
+                      <div>
+                        <div className={styles.progressLabel}>
+                          <span>{item.estatistica}</span>
+                          <strong>{item.status === "bom" ? "Escalar" : item.status === "alerta" ? "Acompanhar" : "Recuperar"}</strong>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <article className={styles.chartPanel}>
+                  <h2>Servicos para olhar primeiro</h2>
+                  <p>
+                    Comece pelos servicos abaixo. Eles mostram onde o caixa pode subir ou onde a queda precisa ser corrigida.
+                  </p>
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Servico</th>
+                          <th>Agora</th>
+                          <th>Subiu ou caiu</th>
+                          <th>Ate dezembro</th>
+                          <th>O que fazer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previsaoCampo.servicos.map((servico) => (
+                          <tr key={`${servico.codigo}-${servico.servico}`}>
+                            <td>
+                              <strong>{servico.servico}</strong>
+                              <span>Codigo {servico.codigo}</span>
+                            </td>
+                            <td>{moeda.format(servico.atual)}</td>
+                            <td className={servico.status === "critico" ? styles.negative : styles.positive}>
+                              {formatarPercentual(servico.tendencia)}
+                            </td>
+                            <td>{moeda.format(servico.previsaoAno)}</td>
+                            <td>{servico.acao}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              </>
+            ) : (
+              <article className={styles.panel}>
+                <div className={styles.comparisonEmpty}>
+                  <strong>Previsao de campo aguardando dados.</strong>
+                  <p>Envie pelo menos uma competencia com honorarios para liberar o motor anual.</p>
+                </div>
+              </article>
+            )}
+          </section>
+        </div>
+
+        <div className={`${styles.tabContent} ${abaAtiva === "metaAnual" ? styles.tabVisible : ""}`} data-tab="metaAnual">
+          <section className={styles.sectionStack} data-print-section="Meta anual">
+            {botaoImprimirAba("metaAnual")}
+            {metaAnual ? (
+              <>
+                <article className={`${styles.annualGoalHero} ${statusClasse(metaAnual.status)}`}>
+                  <div>
+                    <span>Plano de crescimento</span>
+                    <h2>{metaAnual.titulo}</h2>
+                    <p>{metaAnual.subtitulo}</p>
+                    <small>{metaAnual.origemBase}. Filtro atual: {contextoAnalise.filtroServicos}.</small>
+                  </div>
+                  <strong className={statusClasse(metaAnual.status)}>
+                    {metaAnual.status === "bom" ? "Projecao: meta superada" : metaAnual.status === "alerta" ? "Projecao: acompanhar" : "Projecao: em risco"}
+                  </strong>
+                </article>
+
+                <div className={styles.annualGoalGrid}>
+                  <article className={styles.annualGoalGaugeCard}>
+                    <div className={styles.panelHeader}>
+                      <Target size={20} />
+                      <h2>Meta anual {metaAnual.ano}</h2>
+                    </div>
+                    <div
+                      className={styles.annualGaugeRing}
+                      style={{ "--annual-progress": `${Math.min(100, Math.max(0, Math.round(metaAnual.percentualAno * 100)))}%` } as React.CSSProperties}
+                    >
+                      <strong>{Math.round(metaAnual.percentualAno * 100)}%</strong>
+                      <span>do ano</span>
+                    </div>
+                    <div className={styles.annualGoalFacts}>
+                      <div>
+                        <span>Meta anual</span>
+                        <strong>{moeda.format(metaAnual.metaAno)}</strong>
+                      </div>
+                      <div>
+                        <span>Realizado ({metaAnual.mesesRealizados}m)</span>
+                        <strong>{moeda.format(metaAnual.realizado)}</strong>
+                      </div>
+                      <div>
+                        <span>Falta</span>
+                        <strong>{moeda.format(metaAnual.falta)}</strong>
+                      </div>
+                      <div>
+                        <span>Projecao fechamento</span>
+                        <strong className={metaAnual.projecao >= metaAnual.metaAno ? styles.positive : styles.negative}>
+                          {moeda.format(metaAnual.projecao)}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Ritmo necessario/mes</span>
+                        <strong>{moeda.format(metaAnual.ritmoNecessarioMes)}</strong>
+                      </div>
+                    </div>
+                    <div className={styles.annualGoalMessage}>
+                      <Gauge size={18} />
+                      <strong>{metaAnual.mensagem}</strong>
+                    </div>
+                  </article>
+
+                  <article className={styles.chartPanel}>
+                    <div className={styles.panelHeader}>
+                      <TrendingUp size={20} />
+                      <h2>Realizado acumulado vs meta acumulada</h2>
+                    </div>
+                    <p>
+                      A linha verde mostra o realizado nos periodos enviados. A linha laranja mostra a meta acumulada ate dezembro.
+                    </p>
+                    <ResponsiveContainer width="100%" height={360}>
+                      <LineChart data={metaAnual.grafico}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="mes" />
+                        <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                        <Line type="monotone" dataKey="metaAcumulada" name="Meta acumulada" stroke="#d17a22" strokeWidth={3} strokeDasharray="6 5" dot={false} />
+                        <Line type="monotone" dataKey="realizadoAcumulado" name="Realizado acumulado" stroke="#1f9d72" strokeWidth={3} connectNulls={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </article>
+                </div>
+
+                <article className={styles.annualGoalTablePanel}>
+                  <div className={styles.panelHeader}>
+                    <Target size={20} />
+                    <h2>Metas por linha de servico</h2>
+                  </div>
+                  <p>
+                    Cada linha usa a base disponivel no filtro atual. Com dados de {metaAnual.ano - 1}, usa {metaAnual.ano - 1} +30%; sem isso, estima pelo ritmo lido.
+                  </p>
+                  <div className={styles.tableWrap}>
+                    <table className={`${styles.table} ${styles.annualGoalTable}`}>
+                      <thead>
+                        <tr>
+                          <th>Servico</th>
+                          <th>Meta {metaAnual.ano}</th>
+                          <th>Realizado</th>
+                          <th>% atingido</th>
+                          <th>Projecao</th>
+                          <th>Progresso</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metaAnual.servicos.map((servico) => (
+                          <tr key={`meta-anual-${servico.codigo}-${servico.servico}`}>
+                            <td>
+                              <strong>{servico.servico}</strong>
+                              <span>Codigo {servico.codigo}</span>
+                            </td>
+                            <td>{moeda.format(servico.meta)}</td>
+                            <td>{moeda.format(servico.realizado)}</td>
+                            <td>{Math.round(servico.percentual * 100)}%</td>
+                            <td>{moeda.format(servico.projecao)}</td>
+                            <td>
+                              <div className={styles.progressBar}>
+                                <span style={{ width: `${Math.min(100, Math.max(8, Math.round(servico.progresso)))}%` }} />
+                              </div>
+                            </td>
+                            <td>
+                              <span className={servico.status === "bom" ? styles.badgeLow : servico.status === "alerta" ? styles.badgeMedium : styles.badgeHigh}>
+                                {servico.statusLabel}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              </>
+            ) : (
+              <article className={styles.panel}>
+                <div className={styles.comparisonEmpty}>
+                  <strong>Meta anual aguardando dados.</strong>
+                  <p>Envie pelo menos uma competencia para montar a meta anual dinamica.</p>
+                </div>
+              </article>
+            )}
+          </section>
+        </div>
+
+        <div className={`${styles.tabContent} ${abaAtiva === "planosFinanceiros" ? styles.tabVisible : ""}`} data-tab="planosFinanceiros">
+          <section className={styles.sectionStack} data-print-section="Planos financeiros">
+            {botaoImprimirAba("planosFinanceiros")}
+            {planoFinanceiro ? (
+              <>
+                <article className={`${styles.pnvaCoreHero} ${statusClasse(planoFinanceiro.status)}`}>
+                  <div>
+                    <span>Arquitetura financeira</span>
+                    <h2>Plano de caixa por produtos</h2>
+                    <p>{planoFinanceiro.diagnostico}</p>
+                  </div>
+                  <div className={styles.pnvaCoreCommand}>
+                    <span>Comando financeiro</span>
+                    <strong>{planoFinanceiro.comando}</strong>
+                  </div>
+                </article>
+
+                <div className={styles.pnvaCoreScoreboard}>
+                  {planoFinanceiro.arquitetura.map((item) => (
+                    <div className={statusClasse(item.status)} key={item.bloco}>
+                      <span>{item.bloco}</span>
+                      <strong>{item.valor}</strong>
+                      <small>{item.detalhe}</small>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={styles.chartGrid}>
+                  <article className={styles.chartPanel}>
+                    <h2>Produtos que sustentam o caixa</h2>
+                    <p>
+                      Mostra quanto cada produto traz de honorarios no periodo atual e ajuda a ver dependencia, escala e risco.
+                    </p>
+                    <ResponsiveContainer width="100%" height={340}>
+                      <BarChart data={planoFinanceiro.grafico}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="produto" />
+                        <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                        <Bar dataKey="caixa" name="Caixa por produto" fill="#1f9d72" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </article>
+
+                  <article className={styles.panel}>
+                    <div className={styles.panelHeader}>
+                      <ShieldCheck size={20} />
+                      <h2>Rotina de governanca</h2>
+                    </div>
+                    <div className={styles.diagnosisGrid}>
+                      {planoFinanceiro.rotinas.map((rotina) => (
+                        <div className={statusClasse(rotina.status)} key={rotina.janela}>
+                          <span>{rotina.janela}</span>
+                          <strong>{rotina.rotina}</strong>
+                          <small>{rotina.numero}</small>
+                          <small>{rotina.decisao}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                </div>
+
+                <article className={styles.chartPanel}>
+                  <h2>Mapa financeiro por produto</h2>
+                  <p>
+                    Classifica cada produto pelo papel no caixa, tendencia, participacao e acao financeira recomendada.
+                  </p>
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Produto</th>
+                          <th>Papel no caixa</th>
+                          <th>Caixa</th>
+                          <th>Participacao</th>
+                          <th>{valorOsDisponivel ? "Margem" : "Ticket"}</th>
+                          <th>Tendencia</th>
+                          <th>Acao financeira</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {planoFinanceiro.produtos.map((produto) => (
+                          <tr key={`financeiro-${produto.codigo}-${produto.servico}`}>
+                            <td>
+                              <strong>{produto.servico}</strong>
+                              <span>Codigo {produto.codigo} | {numero.format(produto.quantidade)} O.S.</span>
+                            </td>
+                            <td>{produto.papel}</td>
+                            <td>{moeda.format(produto.honorarios)}</td>
+                            <td>{formatarPercentual(produto.participacao)}</td>
+                            <td>{valorOsDisponivel ? formatarPercentual(produto.margem) : moeda.format(produto.ticket)}</td>
+                            <td className={(produto.tendencia || 0) >= 0 ? styles.positive : styles.negative}>
+                              {formatarPercentual(produto.tendencia)}
+                            </td>
+                            <td>{produto.acao}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              </>
+            ) : (
+              <article className={styles.panel}>
+                <div className={styles.comparisonEmpty}>
+                  <strong>Plano financeiro aguardando dados.</strong>
+                  <p>Envie uma competencia com produtos/servicos para montar a arquitetura de caixa.</p>
+                </div>
+              </article>
             )}
           </section>
         </div>
@@ -5110,7 +7156,7 @@ export default function AnaliseHonorariosPage() {
               <article className={styles.chartPanel}>
                 <h2>Honorarios por mes</h2>
                 <p>Compara cada documento com o periodo anterior. A barra verde e o periodo analisado; a azul e a base de comparacao.</p>
-                <ResponsiveContainer width="100%" height={320}>
+                <ChartShell height={320}>
                   <BarChart data={comparativoGrafico}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="mes" />
@@ -5120,7 +7166,7 @@ export default function AnaliseHonorariosPage() {
                     <Bar dataKey="honorarios2025" name="Periodo anterior" fill="#4666c9" radius={[6, 6, 0, 0]} />
                     <Bar dataKey="honorarios2026" name="Periodo atual" fill="#1f9d72" radius={[6, 6, 0, 0]} />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartShell>
               </article>
 
               <article className={styles.chartPanel}>
@@ -5128,7 +7174,7 @@ export default function AnaliseHonorariosPage() {
                 {valorOsDisponivel ? (
                   <>
                     <p>Mostra se o valor medio por processo subiu ou caiu. Queda no ticket pode explicar perda mesmo com volume parecido.</p>
-                    <ResponsiveContainer width="100%" height={320}>
+                    <ChartShell height={320}>
                       <LineChart data={comparativoGrafico}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="mes" />
@@ -5138,12 +7184,12 @@ export default function AnaliseHonorariosPage() {
                         <Line dataKey="ticket2025" name="Periodo anterior" stroke="#4666c9" strokeWidth={3} />
                         <Line dataKey="ticket2026" name="Periodo atual" stroke="#d17a22" strokeWidth={3} />
                       </LineChart>
-                    </ResponsiveContainer>
+                    </ChartShell>
                   </>
                 ) : (
                   <>
                     <p>Usa Total de O.S. e honorarios que existem neste PDF para medir quanto cada O.S. gerou em media.</p>
-                    <ResponsiveContainer width="100%" height={320}>
+                    <ChartShell height={320}>
                       <LineChart data={comparativoGrafico}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="mes" />
@@ -5153,7 +7199,7 @@ export default function AnaliseHonorariosPage() {
                         <Line dataKey="honorarioMedioAnterior" name="Periodo anterior" stroke="#4666c9" strokeWidth={3} />
                         <Line dataKey="honorarioMedioAtual" name="Periodo atual" stroke="#d17a22" strokeWidth={3} />
                       </LineChart>
-                    </ResponsiveContainer>
+                    </ChartShell>
                   </>
                 )}
               </article>
@@ -5164,7 +7210,7 @@ export default function AnaliseHonorariosPage() {
                 <h2>Mix de honorarios por servico</h2>
                 <p>Pizza dos servicos que mais pesaram no periodo atual. Quanto maior a fatia, maior a dependencia desse servico no resultado.</p>
                 <div className={styles.pieLayout}>
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ChartShell height={300}>
                     <PieChart>
                       <Pie
                         data={mixServicosPizza}
@@ -5182,7 +7228,7 @@ export default function AnaliseHonorariosPage() {
                       </Pie>
                       <Tooltip content={<CustomTooltip />} />
                     </PieChart>
-                  </ResponsiveContainer>
+                  </ChartShell>
                   <div className={styles.pieLegend}>
                     {mixServicosPizza.map((item) => (
                       <div key={`${item.codigo}-${item.nome}`}>
@@ -5248,7 +7294,7 @@ export default function AnaliseHonorariosPage() {
             <article className={styles.chartPanel}>
               <h2>Servicos que mais geraram honorarios em {dadosAtuais.comparacao?.atualLabel}</h2>
               <p>Ranking dos servicos que mais pesaram no resultado atual, com volume, media e crescimento.</p>
-              <ResponsiveContainer width="100%" height={360}>
+              <ChartShell height={360}>
                 <AreaChart data={dadosAtuais.servicos.slice(0, 7)}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="codigo" />
@@ -5256,7 +7302,7 @@ export default function AnaliseHonorariosPage() {
                   <Tooltip content={<CustomTooltip />} />
                   <Area dataKey="honorarios2026" name={`Honorarios ${dadosAtuais.comparacao?.atualLabel}`} stroke="#1f9d72" fill="#bfe8da" />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ChartShell>
             </article>
 
             <div className={styles.tableWrap}>
@@ -5301,7 +7347,11 @@ export default function AnaliseHonorariosPage() {
                     <p>
                       {planoCompetencia.emAndamento
                         ? `A competencia esta em andamento. O realizado usa os ${planoCompetencia.diasCobertos} dias reconhecidos e a projecao acompanha o ritmo ate o fechamento.`
-                        : "A competencia alvo ainda nao foi enviada. A meta usa somente meses fechados e comparaveis."}
+                        : planoCompetencia.modo === "mes-anterior"
+                          ? "A competencia anterior esta fechada. Ela entra como base/historico; a cobranca ativa fica para o mes atual ou proximo."
+                          : planoCompetencia.modo === "proximo-mes"
+                          ? "A competencia alvo foi enviada para o proximo mes pelo filtro da meta."
+                          : "A competencia alvo usa o mes atual do calendario."}
                     </p>
                   </div>
                   <div className={styles.junePlanTarget}>
@@ -5313,24 +7363,30 @@ export default function AnaliseHonorariosPage() {
 
                 <div className={styles.junePlanMetrics}>
                   <div>
-                    <span>Base robusta</span>
+                    <span>Base da meta</span>
                     <strong>{moeda.format(planoCompetencia.baseMeta)}</strong>
                     <small>{planoCompetencia.periodosBase.join(", ")}</small>
                   </div>
                   <div>
-                    <span>Realizado</span>
-                    <strong>{planoCompetencia.realizado ? moeda.format(planoCompetencia.realizado) : "Aguardando arquivo"}</strong>
-                    <small>{planoCompetencia.emAndamento ? `${planoCompetencia.diasCobertos}/${planoCompetencia.diasNoMes} dias` : "Competencia futura"}</small>
+                    <span>{competenciaMetaSemDados ? "Dados da competencia" : "Realizado"}</span>
+                    <strong>{planoCompetencia.realizado ? moeda.format(planoCompetencia.realizado) : "Sem arquivo"}</strong>
+                    <small>
+                      {planoCompetencia.emAndamento
+                        ? `${planoCompetencia.diasCobertos}/${planoCompetencia.diasNoMes} dias`
+                        : competenciaMetaFechada
+                          ? "Competencia fechada"
+                          : "Previsao preparada sem arquivo da competencia"}
+                    </small>
                   </div>
                   <div>
                     <span>Projecao de fechamento</span>
                     <strong>{moeda.format(planoCompetencia.projecao)}</strong>
-                    <small>{formatarPercentual(planoCompetencia.crescimentoProjetado)} sobre a base robusta</small>
+                    <small>{formatarPercentual(planoCompetencia.crescimentoProjetado)} sobre a base da meta</small>
                   </div>
                   <div>
-                    <span>{planoCompetencia.atingiuMeta ? "Meta superada" : "Gap projetado"}</span>
-                    <strong>{planoCompetencia.atingiuMeta ? moeda.format(planoCompetencia.realizado - planoCompetencia.meta) : moeda.format(planoCompetencia.gapProjetado)}</strong>
-                    <small>{planoCompetencia.statusLabel}</small>
+                    <span>{competenciaMetaFechada ? "Gap ativo" : planoCompetencia.atingiuMeta ? "Meta superada" : "Gap projetado"}</span>
+                    <strong>{competenciaMetaFechada ? moeda.format(0) : planoCompetencia.atingiuMeta ? moeda.format(planoCompetencia.realizado - planoCompetencia.meta) : moeda.format(planoCompetencia.gapProjetado)}</strong>
+                    <small>{competenciaMetaFechada ? "Sem cobranca ativa no mes passado." : planoCompetencia.statusLabel}</small>
                   </div>
                 </div>
 
@@ -5355,7 +7411,7 @@ export default function AnaliseHonorariosPage() {
                       {planoCompetencia.servicosFoco.map((servico, index) => (
                         <p key={servico.servico}>
                           <strong>{index + 1}. {servico.servico}</strong>
-                          <small>{moeda.format(servico.honorarios)} nos meses fechados usados pela equacao</small>
+                          <small>{moeda.format(servico.honorarios)} no periodo base usado pela equacao</small>
                         </p>
                       ))}
                     </div>
@@ -5406,7 +7462,7 @@ export default function AnaliseHonorariosPage() {
                   <span>Divisao operacional</span>
                   <h2>Meta por funcionario</h2>
                   <p>
-                    Informe a quantidade de vendedores ou funcionarios. A aba divide a meta do mes, a base atual e o acrescimo de 30% usando os mesmos dados ja calculados em Metas.
+                    Informe a quantidade de vendedores ou funcionarios. A aba separa mes fechado, mes atual sem arquivo e proximo mes previsto para nao cobrar falta de uma competencia que ja virou base.
                   </p>
                 </div>
                 <label className={styles.employeeGoalInput}>
@@ -5426,7 +7482,9 @@ export default function AnaliseHonorariosPage() {
                   <span>Cada funcionario precisa fazer</span>
                   <strong>{moeda.format(metaFuncionarios.alvoPorFuncionario)}</strong>
                   <small>
-                    Para bater a meta de {moeda.format(metaFuncionarios.alvoMes)} em {planoCompetencia?.label || "meta do mes"}.
+                    {metaFuncionarios.competenciaFechada
+                      ? `${planoCompetencia?.label || "Competencia"} esta fechada; este valor vira referencia para a proxima execucao.`
+                      : `Para bater a meta de ${moeda.format(metaFuncionarios.alvoMes)} em ${planoCompetencia?.label || "meta do mes"}.`}
                   </small>
                 </div>
                 <div>
@@ -5434,6 +7492,25 @@ export default function AnaliseHonorariosPage() {
                   <strong>{moeda.format(metaFuncionarios.adicionalPorFuncionario)}</strong>
                   <small>
                     Acrescimo individual acima da base de {moeda.format(metaFuncionarios.basePorFuncionario)}.
+                  </small>
+                </div>
+              </div>
+
+              <div className={styles.employeeGoalHero}>
+                <div>
+                  <span>Funcionario que vende mais</span>
+                  <strong>{moeda.format(metaFuncionarios.liderAlvoPorFuncionario)}</strong>
+                  <small>
+                    {metaFuncionarios.competenciaFechada
+                      ? "Mes fechado: use como leitura de capacidade, nao como cobranca de falta."
+                      : `Lider puxa a meta individual e cobre uma parte do gap: ${numero.format(metaFuncionarios.liderAlvoOsPorFuncionario)} O.S.`}
+                  </small>
+                </div>
+                <div>
+                  <span>Funcionario que vende menos</span>
+                  <strong>{moeda.format(metaFuncionarios.baixoPisoPorFuncionario)}</strong>
+                  <small>
+                    Piso para nao travar a meta: {numero.format(metaFuncionarios.baixoPisoOsPorFuncionario)} O.S.
                   </small>
                 </div>
               </div>
@@ -5455,9 +7532,29 @@ export default function AnaliseHonorariosPage() {
                   <small>Total que a equipe precisa bater</small>
                 </div>
                 <div>
-                  <span>Falta por funcionario</span>
+                  <span>{metaFuncionarios.competenciaFechada ? "Falta ativa" : metaFuncionarios.competenciaSemDados ? "Gap previsto por funcionario" : "Falta por funcionario"}</span>
                   <strong>{moeda.format(metaFuncionarios.faltaPorFuncionario)}</strong>
-                  <small>Considerando o realizado atual de {moeda.format(metaFuncionarios.realizadoMes)}</small>
+                  <small>
+                    {metaFuncionarios.competenciaFechada
+                      ? "Competencia fechada: sem cobranca operacional neste filtro."
+                      : metaFuncionarios.competenciaSemDados
+                        ? `Sem arquivo da competencia; usando previsao de ${moeda.format(metaFuncionarios.referenciaFaltaMes)}.`
+                        : `Considerando o realizado atual de ${moeda.format(metaFuncionarios.realizadoMes)}.`}
+                  </small>
+                </div>
+                <div>
+                  <span>Meta de O.S. +30%</span>
+                  <strong>{numero.format(metaFuncionarios.alvoOs)}</strong>
+                  <small>Base O.S.: {numero.format(metaFuncionarios.baseOs)}</small>
+                </div>
+                <div>
+                  <span>O.S. por funcionario</span>
+                  <strong>{numero.format(metaFuncionarios.alvoOsPorFuncionario)}</strong>
+                  <small>
+                    {metaFuncionarios.competenciaFechada
+                      ? "Mes fechado: numero guardado como base."
+                      : `Falta individual prevista: ${numero.format(metaFuncionarios.faltaOsPorFuncionario)}`}
+                  </small>
                 </div>
               </div>
 
@@ -5487,14 +7584,302 @@ export default function AnaliseHonorariosPage() {
                       <td>{moeda.format(metaFuncionarios.alvoPorFuncionario)}</td>
                     </tr>
                     <tr>
-                      <td>Falta para fechar a meta</td>
+                      <td>{metaFuncionarios.competenciaFechada ? "Falta ativa no mes fechado" : metaFuncionarios.competenciaSemDados ? "Gap previsto para fechar a meta" : "Falta para fechar a meta"}</td>
                       <td>{moeda.format(metaFuncionarios.faltaMes)}</td>
                       <td>{moeda.format(metaFuncionarios.faltaPorFuncionario)}</td>
+                    </tr>
+                    <tr>
+                      <td>Base de O.S. antes do crescimento</td>
+                      <td>{numero.format(metaFuncionarios.baseOs)}</td>
+                      <td>{numero.format(metaFuncionarios.baseOsPorFuncionario)}</td>
+                    </tr>
+                    <tr>
+                      <td>Acréscimo de O.S. em 30%</td>
+                      <td>{numero.format(metaFuncionarios.adicionalOs)}</td>
+                      <td>{numero.format(metaFuncionarios.adicionalOsPorFuncionario)}</td>
+                    </tr>
+                    <tr>
+                      <td>Meta final de O.S.</td>
+                      <td>{numero.format(metaFuncionarios.alvoOs)}</td>
+                      <td>{numero.format(metaFuncionarios.alvoOsPorFuncionario)}</td>
+                    </tr>
+                    <tr>
+                      <td>{metaFuncionarios.competenciaFechada ? "Falta ativa de O.S. no mes fechado" : metaFuncionarios.competenciaSemDados ? "Gap previsto de O.S. para fechar a meta" : "Falta de O.S. para fechar a meta"}</td>
+                      <td>{numero.format(metaFuncionarios.faltaOs)}</td>
+                      <td>{numero.format(metaFuncionarios.faltaOsPorFuncionario)}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </article>
+          </section>
+        </div>
+
+        <div className={`${styles.tabContent} ${abaAtiva === "relatorio" ? styles.tabVisible : ""}`} data-tab="relatorio">
+          <section className={styles.sectionStack} data-print-section="Relatorio mes a mes">
+            {botaoImprimirAba("relatorio")}
+
+            {/* ── Summary banner ── */}
+            {(() => {
+              const periodosReais = periodosAnalisados.filter((p) => p.meta30 > 0);
+              const bateram = periodosReais.filter((p) => p.atingiuMeta).length;
+              const totalMeta = periodosReais.length;
+              const pctBateram = totalMeta > 0 ? bateram / totalMeta : 0;
+              const melhorMes = [...periodosAnalisados].sort((a, b) => (b.honorarios || 0) - (a.honorarios || 0))[0];
+              const ytd = periodosAnalisados.reduce((s, p) => s + p.honorarios, 0);
+              const projecaoAnual = ytd + previsaoAnualMeses.reduce((s, p) => s + p.honorarios, 0);
+              return (
+                <div className={styles.relatorioSummary}>
+                  <div className={styles.relatorioSummaryItem}>
+                    <span className={styles.relatorioSummaryLabel}>Periodos importados</span>
+                    <strong className={styles.relatorioSummaryValue}>{periodosAnalisados.length}</strong>
+                  </div>
+                  {base2025Info && (
+                    <div className={`${styles.relatorioSummaryItem} ${styles.relatorioSummaryBase}`}>
+                      <span className={styles.relatorioSummaryLabel}>Base {base2025Info.ano}{base2025Info.isAnualTotal ? " (ano inteiro)" : ""}</span>
+                      <strong className={styles.relatorioSummaryValue}>{moeda.format(base2025Info.total)}</strong>
+                      <span className={styles.relatorioSummaryDetalhe}>media {moeda.format(base2025Info.mediaMensal)}/mes</span>
+                    </div>
+                  )}
+                  <div className={styles.relatorioSummaryItem}>
+                    <span className={styles.relatorioSummaryLabel}>Meta +30% atingida</span>
+                    <strong className={`${styles.relatorioSummaryValue} ${bateram === totalMeta && totalMeta > 0 ? styles.relatorioValorBom : bateram > 0 ? styles.relatorioValorAlerta : styles.relatorioValorCritico}`}>
+                      {bateram}/{totalMeta}
+                    </strong>
+                  </div>
+                  <div className={styles.relatorioSummaryItem}>
+                    <span className={styles.relatorioSummaryLabel}>Taxa de sucesso</span>
+                    <strong className={`${styles.relatorioSummaryValue} ${pctBateram >= 0.7 ? styles.relatorioValorBom : pctBateram >= 0.4 ? styles.relatorioValorAlerta : styles.relatorioValorCritico}`}>
+                      {totalMeta > 0 ? `${Math.round(pctBateram * 100)}%` : "—"}
+                    </strong>
+                  </div>
+                  {melhorMes && (
+                    <div className={styles.relatorioSummaryItem}>
+                      <span className={styles.relatorioSummaryLabel}>Melhor mes</span>
+                      <strong className={`${styles.relatorioSummaryValue} ${styles.relatorioValorBom}`}>{melhorMes.label}</strong>
+                    </div>
+                  )}
+                  {previsaoAnualMeses.length > 0 && (
+                    <div className={`${styles.relatorioSummaryItem} ${styles.relatorioSummaryProjecao}`}>
+                      <span className={styles.relatorioSummaryLabel}>Projecao {dadosAtuais.anos.atual} (12 meses)</span>
+                      <strong className={styles.relatorioSummaryValue}>{moeda.format(projecaoAnual)}</strong>
+                      {base2025Info && (
+                        <span className={`${styles.relatorioSummaryDetalhe} ${projecaoAnual > base2025Info.total ? styles.relatorioValorBom : styles.relatorioValorCritico}`}>
+                          {formatarPercentual(projecaoAnual / base2025Info.total - 1)} vs {base2025Info.ano}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ── Month-by-month table ── */}
+            <article className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <CalendarDays size={20} />
+                <h2>Evolucao mensal — Real + Previsao ate Dezembro</h2>
+              </div>
+              <p>Meses reais importados seguidos de previsao por tendencia para os meses restantes do ano. {base2025Info ? `Coluna "vs ${base2025Info.ano}" compara cada mes com a media mensal do ano anterior (${moeda.format(base2025Info.mediaMensal)}/mes).` : ""}</p>
+
+              {periodosAnalisados.length === 0 ? (
+                <div className={styles.relatorioEmpty}>Nenhum periodo importado. Envie PDFs para ver o relatorio.</div>
+              ) : (
+                <div className={styles.relatorioTableWrap}>
+                  <table className={styles.relatorioTable}>
+                    <thead>
+                      <tr>
+                        <th>Periodo</th>
+                        <th className={styles.relatorioNumCol}>Qtd O.S.</th>
+                        <th className={styles.relatorioNumCol}>Honorarios</th>
+                        <th className={styles.relatorioNumCol}>Meta +30%</th>
+                        <th className={styles.relatorioNumCol}>Variacao</th>
+                        {base2025Info && <th className={styles.relatorioNumCol}>vs {base2025Info.ano}</th>}
+                        <th className={styles.relatorioStatusCol}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* ── Actual months ── */}
+                      {periodosAnalisados.map((periodo, index) => {
+                        const semBase = periodo.meta30 === 0;
+                        const variacao = periodo.crescimentoHonorarios;
+                        const vs2025 = base2025Info ? (periodo.honorarios / base2025Info.mediaMensal - 1) : null;
+                        const statusClass = semBase
+                          ? styles.relatorioStatusNeutro
+                          : periodo.atingiuMeta
+                          ? styles.relatorioStatusBom
+                          : variacao !== null && variacao >= 0
+                          ? styles.relatorioStatusAlerta
+                          : styles.relatorioStatusCritico;
+                        const statusLabel = semBase ? "Base" : periodo.atingiuMeta ? "Meta atingida" : variacao !== null && variacao >= 0 ? "Abaixo da meta" : "Queda";
+                        return (
+                          <tr key={periodo.label} className={index === 0 ? styles.relatorioRowBase : ""}>
+                            <td className={styles.relatorioLabelCell}>
+                              <span className={styles.relatorioMesLabel}>{periodo.label}</span>
+                            </td>
+                            <td className={styles.relatorioNumCol}>{numero.format(periodo.quantidade)}</td>
+                            <td className={`${styles.relatorioNumCol} ${styles.relatorioHonorarioCell}`}>{moeda.format(periodo.honorarios)}</td>
+                            <td className={styles.relatorioNumCol}>
+                              {semBase ? <span className={styles.relatorioSemBase}>—</span> : moeda.format(periodo.meta30)}
+                            </td>
+                            <td className={`${styles.relatorioNumCol} ${variacao !== null ? (variacao >= 0.3 ? styles.relatorioValorBom : variacao >= 0 ? styles.relatorioValorAlerta : styles.relatorioValorCritico) : ""}`}>
+                              {variacao !== null ? formatarPercentual(variacao) : "—"}
+                            </td>
+                            {base2025Info && (
+                              <td className={`${styles.relatorioNumCol} ${vs2025 !== null ? (vs2025 >= 0.5 ? styles.relatorioValorBom : vs2025 >= 0 ? styles.relatorioValorAlerta : styles.relatorioValorCritico) : ""}`}>
+                                {vs2025 !== null ? formatarPercentual(vs2025) : "—"}
+                              </td>
+                            )}
+                            <td className={styles.relatorioStatusCol}>
+                              <span className={`${styles.relatorioStatusBadge} ${statusClass}`}>{statusLabel}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {/* ── Separator before forecast ── */}
+                      {previsaoAnualMeses.length > 0 && (
+                        <tr className={styles.relatorioSeparadorPrevisao}>
+                          <td colSpan={base2025Info ? 7 : 6}>
+                            <span className={styles.relatorioPrevisaoTag}>
+                              Previsao {periodosImportados.filter((p) => p.ano === (previsaoAnualMeses[0]?.ano ?? 0)).length >= 2 ? "por tendencia" : `base ${base2025Info?.ano ?? "anual"}`} — {previsaoAnualMeses.length} {previsaoAnualMeses.length === 1 ? "mes restante" : "meses restantes"} ate Dezembro
+                            </span>
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* ── Forecast months ── */}
+                      {previsaoAnualMeses.map((prev) => {
+                        const variacaoP = prev.crescimentoHonorarios;
+                        const vs2025P = base2025Info ? (prev.honorarios / base2025Info.mediaMensal - 1) : null;
+                        const statusClassP = prev.atingiuMeta ? styles.relatorioStatusBom : variacaoP !== null && variacaoP >= 0 ? styles.relatorioStatusAlerta : styles.relatorioStatusCritico;
+                        const statusLabelP = prev.atingiuMeta ? "Meta prevista" : variacaoP !== null && variacaoP >= 0 ? "Crescimento" : "Queda prevista";
+                        return (
+                          <tr key={`prev-${prev.label}`} className={styles.relatorioRowPrevisao}>
+                            <td className={styles.relatorioLabelCell}>
+                              <span className={styles.relatorioMesLabel}>{prev.label}</span>
+                              <span className={styles.relatorioPrevisaoBadge}>previsao</span>
+                            </td>
+                            <td className={styles.relatorioNumCol}><span className={styles.relatorioSemBase}>—</span></td>
+                            <td className={`${styles.relatorioNumCol} ${styles.relatorioHonorarioCell} ${styles.relatorioPrevisaoValor}`}>
+                              {moeda.format(prev.honorarios)}
+                            </td>
+                            <td className={styles.relatorioNumCol}>{moeda.format(prev.meta30)}</td>
+                            <td className={`${styles.relatorioNumCol} ${variacaoP !== null ? (variacaoP >= 0.3 ? styles.relatorioValorBom : variacaoP >= 0 ? styles.relatorioValorAlerta : styles.relatorioValorCritico) : ""}`}>
+                              {variacaoP !== null ? formatarPercentual(variacaoP) : "—"}
+                            </td>
+                            {base2025Info && (
+                              <td className={`${styles.relatorioNumCol} ${vs2025P !== null ? (vs2025P >= 0.5 ? styles.relatorioValorBom : vs2025P >= 0 ? styles.relatorioValorAlerta : styles.relatorioValorCritico) : ""}`}>
+                                {vs2025P !== null ? formatarPercentual(vs2025P) : "—"}
+                              </td>
+                            )}
+                            <td className={styles.relatorioStatusCol}>
+                              <span className={`${styles.relatorioStatusBadge} ${statusClassP}`}>{statusLabelP}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className={styles.relatorioTotalRow}>
+                        <td><strong>Realizado</strong></td>
+                        <td className={styles.relatorioNumCol}><strong>{numero.format(periodosAnalisados.reduce((s, p) => s + p.quantidade, 0))}</strong></td>
+                        <td className={styles.relatorioNumCol}><strong>{moeda.format(periodosAnalisados.reduce((s, p) => s + p.honorarios, 0))}</strong></td>
+                        <td colSpan={base2025Info ? 4 : 3}></td>
+                      </tr>
+                      {previsaoAnualMeses.length > 0 && (
+                        <tr className={`${styles.relatorioTotalRow} ${styles.relatorioTotalPrevisao}`}>
+                          <td><strong>Projecao {dadosAtuais.anos.atual}</strong></td>
+                          <td className={styles.relatorioNumCol}></td>
+                          <td className={styles.relatorioNumCol}>
+                            <strong>{moeda.format(periodosAnalisados.reduce((s, p) => s + p.honorarios, 0) + previsaoAnualMeses.reduce((s, p) => s + p.honorarios, 0))}</strong>
+                          </td>
+                          <td colSpan={base2025Info ? 4 : 3}></td>
+                        </tr>
+                      )}
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </article>
+
+            {/* ── Chart: actual bars + forecast + reference lines ── */}
+            {(periodosAnalisados.length >= 2 || previsaoAnualMeses.length >= 2) && (
+              <article className={styles.chartPanel}>
+                <div className={styles.panelHeader}>
+                  <TrendingUp size={20} />
+                  <h2>Honorarios x Meta — Real e Previsao ate Dezembro</h2>
+                </div>
+                <p>
+                  Barras solidas = realizados. Barras claras = previsao por tendencia.
+                  Linha vermelha = meta +30%.{base2025Info ? ` Linha cinza = media mensal ${base2025Info.ano} (${moeda.format(base2025Info.mediaMensal)}/mes).` : ""}
+                </p>
+                <div style={{ height: 310, marginTop: 16 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={[
+                        ...periodosAnalisados.map((p) => ({ ...p, mediaBase2025: base2025Info?.mediaMensal })),
+                        ...previsaoAnualMeses.map((p) => ({ ...p, mediaBase2025: base2025Info?.mediaMensal })),
+                      ]}
+                      margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e4ebe7" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#5c7566" }} />
+                      <YAxis tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: "#5c7566" }} width={62} />
+                      <Tooltip
+                        formatter={(value, name) => {
+                          const v = moeda.format(Number(value));
+                          if (name === "honorarios") return [v, "Honorarios"];
+                          if (name === "meta30") return [v, "Meta +30%"];
+                          if (name === "mediaBase2025") return [v, `Media ${base2025Info?.ano ?? "base"}`];
+                          return [v, String(name)];
+                        }}
+                        labelStyle={{ fontWeight: 700 }}
+                      />
+                      <Legend
+                        formatter={(value) => {
+                          if (value === "honorarios") return "Honorarios";
+                          if (value === "meta30") return "Meta +30%";
+                          if (value === "mediaBase2025") return `Media ${base2025Info?.ano ?? "base"}`;
+                          return value;
+                        }}
+                      />
+                      <Bar dataKey="honorarios" name="honorarios" radius={[4, 4, 0, 0]}>
+                        {[...periodosAnalisados, ...previsaoAnualMeses].map((periodo, idx) => {
+                          if (idx >= periodosAnalisados.length) {
+                            return <Cell key={`prev-${periodo.label}`} fill="#7dc4a8" fillOpacity={0.55} />;
+                          }
+                          return (
+                            <Cell
+                              key={periodo.label}
+                              fill={periodo.meta30 === 0 ? "#8faacc" : periodo.atingiuMeta ? "#1f8f68" : periodo.crescimentoHonorarios !== null && periodo.crescimentoHonorarios >= 0 ? "#b96b16" : "#b7492b"}
+                            />
+                          );
+                        })}
+                      </Bar>
+                      <Line type="monotone" dataKey="meta30" name="meta30" stroke="#c0392b" strokeWidth={2} strokeDasharray="5 3" dot={{ r: 3, fill: "#c0392b" }} connectNulls />
+                      {base2025Info && (
+                        <Line type="monotone" dataKey="mediaBase2025" name="mediaBase2025" stroke="#8090a0" strokeWidth={1.5} strokeDasharray="3 5" dot={false} connectNulls />
+                      )}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </article>
+            )}
+
+            {/* ── Legend ── */}
+            <div className={styles.relatorioLegenda}>
+              <span className={styles.relatorioLegendaBom}>Meta atingida (+30%)</span>
+              <span className={styles.relatorioLegendaAlerta}>Cresceu, abaixo de +30%</span>
+              <span className={styles.relatorioLegendaCritico}>Queda em relacao ao mes anterior</span>
+              <span className={styles.relatorioLegendaNeutro}>Primeiro periodo (sem base)</span>
+              {previsaoAnualMeses.length > 0 && (
+                <span className={styles.relatorioLegendaPrevisao}>Previsao por tendencia</span>
+              )}
+              {base2025Info && (
+                <span className={styles.relatorioLegendaBase}>Referencia {base2025Info.ano}</span>
+              )}
+            </div>
           </section>
         </div>
 
@@ -5539,9 +7924,12 @@ export default function AnaliseHonorariosPage() {
             </div>
           </section>
         </div>
+
           </>
         )}
         </div>
-      </main>
+        </div>
+      </div>
+    </main>
   );
 }
