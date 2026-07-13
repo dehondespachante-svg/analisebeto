@@ -20,7 +20,6 @@ const TOKEN      = "6ad74bc2cdc8d84953ea21ad89c25715d49ad614757b8aea5c599050b5d6
 const URL_LOCAL  = "http://localhost:8787";
 const LS_URL_KEY = "sgdw:url-manual";
 const FIREBASE_RTDB = "https://beto-58a10-default-rtdb.firebaseio.com/sgdw-tunnel.json";
-const WATCH_INTERVAL = 30_000; // 30s — verifica se URL do tunnel mudou
 
 const MESES_LABEL = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
@@ -113,6 +112,13 @@ export default function SgdwConexao({
   const [mesFim, setMesFim]       = useState(12);
 
   const montado = useRef(false);
+  const apiUrlRef = useRef(URL_LOCAL);
+  const statusRef = useRef<Status>("conectando");
+  const pendingDataLoad = useRef(false);
+  useEffect(() => { apiUrlRef.current = apiUrl; }, [apiUrl]);
+  useEffect(() => { statusRef.current = status; }, [status]);
+  const [urlSwitchToast, setUrlSwitchToast] = useState(false);
+
   const anoOpts = Array.from({ length: 8 }, (_, i) => hoje().ano - 7 + i);
   const usandoTunnel = apiUrl !== URL_LOCAL && status === "conectado";
 
@@ -135,10 +141,26 @@ export default function SgdwConexao({
       const msg = e instanceof Error ? e.message : "Erro ao buscar dados.";
       const isRede = msg.toLowerCase().includes("fetch") || msg.includes("502") || msg.includes("504") || msg.includes("530");
       if (isRede) {
-        // Tunnel mudou — busca nova URL direto do Firebase e retenta
+        // SSE pode ja ter atualizado apiUrlRef — tenta URL mais recente primeiro
+        const urlSse = apiUrlRef.current;
+        if (urlSse !== url && await testar(urlSse)) {
+          setApiUrl(urlSse);
+          setStatus("conectado");
+          if (typeof window !== "undefined") localStorage.setItem(LS_URL_KEY, urlSse);
+          try {
+            const r2 = await buscarHonorariosSgdw({ url: urlSse, token: TOKEN }, ai, af, mi, mf);
+            setDados(r2);
+            buscarHonorariosSgdw({ url: urlSse, token: TOKEN }, ai - 1, af - 1, mi, mf)
+              .then((ant) => { setDadosAnt(ant); emitirRelatorio(r2, ant); })
+              .catch(() => { setDadosAnt(null); emitirRelatorio(r2, null); });
+            return;
+          } catch { /* cai no Firebase abaixo */ }
+        }
+        // Fallback: busca nova URL direto do Firebase e retenta
         const { url: novaUrl, at: novaAt } = await lerUrlFirebaseDireto();
         if (novaAt) setFirebaseAt(novaAt);
         if (novaUrl && novaUrl !== url && await testar(novaUrl)) {
+          apiUrlRef.current = novaUrl;
           setApiUrl(novaUrl);
           setStatus("conectado");
           if (typeof window !== "undefined") localStorage.setItem(LS_URL_KEY, novaUrl);
@@ -209,39 +231,52 @@ export default function SgdwConexao({
     });
   }, [autoConectar, buscarDados]);
 
-  // Auto-retry silencioso em "erro" — verifica Firebase a cada 30s sem mudar tela
+  // SSE Firebase — detecta mudanca de URL do tunnel em tempo real (< 1s)
   useEffect(() => {
-    if (status !== "erro") return;
-    let cancelado = false;
-    const verificar = async () => {
-      const { url: novaUrl, at } = await lerUrlFirebaseDireto();
-      if (cancelado) return;
-      if (at) setFirebaseAt(at);
-      if (novaUrl && await testar(novaUrl)) {
-        if (cancelado) return;
-        setApiUrl(novaUrl);
-        setStatus("conectado");
-        if (typeof window !== "undefined") localStorage.setItem(LS_URL_KEY, novaUrl);
-        buscarDados(novaUrl, anoInicio, mesInicio, anoFim, mesFim);
-      }
-    };
-    const t = setTimeout(verificar, 30_000);
-    return () => { cancelado = true; clearTimeout(t); };
-  }, [status, buscarDados, anoInicio, mesInicio, anoFim, mesFim]);
+    let source: EventSource | null = null;
+    let ativo = true;
 
-  // Monitoramento continuo — detecta mudanca de URL do tunnel a cada 30s
+    const abrir = () => {
+      if (!ativo) return;
+      try { source = new EventSource(FIREBASE_RTDB); } catch { return; }
+
+      const processar = async (d: { url?: string; at?: string } | null) => {
+        if (!ativo || !d?.url) return;
+        if (d.at) setFirebaseAt(d.at);
+        if (d.url === apiUrlRef.current) return;
+        if (await testar(d.url)) {
+          apiUrlRef.current = d.url;
+          setApiUrl(d.url);
+          if (typeof window !== "undefined") localStorage.setItem(LS_URL_KEY, d.url);
+          setUrlSwitchToast(true);
+          setTimeout(() => setUrlSwitchToast(false), 4000);
+          if (statusRef.current !== "conectado") {
+            pendingDataLoad.current = true;
+            setStatus("conectado");
+            setErro(null);
+          }
+        }
+      };
+
+      source.addEventListener("put", (ev: MessageEvent) => {
+        try { void processar((JSON.parse(ev.data) as { data?: { url?: string; at?: string } }).data ?? null); } catch { /* silencioso */ }
+      });
+      source.addEventListener("patch", (ev: MessageEvent) => {
+        try { void processar((JSON.parse(ev.data) as { data?: { url?: string; at?: string } }).data ?? null); } catch { /* silencioso */ }
+      });
+      source.onerror = () => { source?.close(); source = null; if (ativo) setTimeout(abrir, 5000); };
+    };
+
+    abrir();
+    return () => { ativo = false; source?.close(); };
+  }, []);
+
+  // Carrega dados quando SSE reconectar do estado "erro" ou "conectando"
   useEffect(() => {
-    if (status !== "conectado") return;
-    const id = setInterval(async () => {
-      const { url: novaUrl } = await lerUrlFirebaseDireto();
-      if (!novaUrl || novaUrl === apiUrl) return;
-      if (await testar(novaUrl)) {
-        setApiUrl(novaUrl);
-        if (typeof window !== "undefined") localStorage.setItem(LS_URL_KEY, novaUrl);
-      }
-    }, WATCH_INTERVAL);
-    return () => clearInterval(id);
-  }, [status, apiUrl]);
+    if (status !== "conectado" || !pendingDataLoad.current) return;
+    pendingDataLoad.current = false;
+    buscarDados(apiUrlRef.current, anoInicio, mesInicio, anoFim, mesFim);
+  }, [status, buscarDados, anoInicio, mesInicio, anoFim, mesFim]);
 
   if (status !== "conectado" && dados === null) {
     return (
@@ -311,6 +346,18 @@ export default function SgdwConexao({
 
   return (
   <>
+    {urlSwitchToast && (
+      <div style={{
+        position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+        background: "#1a7d50", color: "#fff", borderRadius: 10,
+        padding: "10px 20px", fontWeight: 700, fontSize: "0.84rem",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.22)",
+        display: "flex", alignItems: "center", gap: 8,
+        pointerEvents: "none",
+      }}>
+        <Wifi size={14} /> Tunnel reconectado automaticamente
+      </div>
+    )}
     {status !== "conectado" && (
       <article className={styles.panel} style={{ padding: "10px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
