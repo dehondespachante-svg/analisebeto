@@ -60,12 +60,23 @@ async function registrarUrlFirebase(url: string): Promise<void> {
   } catch { /* silencioso */ }
 }
 
+// Teste via proxy Vercel — o servidor faz a requisicao ao tunnel,
+// evitando CORS e restricoes de rede do browser
 async function testar(url: string): Promise<boolean> {
+  if (url === URL_LOCAL) {
+    // localhost: testa direto do browser (nao passa pelo Vercel)
+    try {
+      const res = await fetch(`${url}/api/status`, { signal: AbortSignal.timeout(4000) });
+      return res.ok;
+    } catch { return false; }
+  }
   try {
-    const res = await fetch(`${url}/api/status`, {
-      signal: AbortSignal.timeout(8000),
+    const res = await fetch(`/api/sgdw-probe?url=${encodeURIComponent(url)}`, {
+      signal: AbortSignal.timeout(12000),
     });
-    return res.ok;
+    if (!res.ok) return false;
+    const d = await res.json() as { ok?: boolean };
+    return d.ok === true;
   } catch { return false; }
 }
 
