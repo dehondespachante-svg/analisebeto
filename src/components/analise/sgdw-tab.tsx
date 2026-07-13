@@ -237,21 +237,29 @@ export default function SgdwConexao({
       if (!ativo) return;
       try { source = new EventSource(FIREBASE_RTDB); } catch { return; }
 
+      const aplicarUrl = (url: string) => {
+        apiUrlRef.current = url;
+        setApiUrl(url);
+        if (typeof window !== "undefined") localStorage.setItem(LS_URL_KEY, url);
+        setUrlSwitchToast(true);
+        setTimeout(() => setUrlSwitchToast(false), 4000);
+        if (statusRef.current !== "conectado") {
+          pendingDataLoad.current = true;
+          setStatus("conectado");
+          setErro(null);
+        }
+      };
+
       const processar = async (d: { url?: string; at?: string } | null) => {
         if (!ativo || !d?.url) return;
         if (d.at) setFirebaseAt(d.at);
-        if (d.url === apiUrlRef.current) return;
-        if (await testar(d.url)) {
-          apiUrlRef.current = d.url;
-          setApiUrl(d.url);
-          if (typeof window !== "undefined") localStorage.setItem(LS_URL_KEY, d.url);
-          setUrlSwitchToast(true);
-          setTimeout(() => setUrlSwitchToast(false), 4000);
-          if (statusRef.current !== "conectado") {
-            pendingDataLoad.current = true;
-            setStatus("conectado");
-            setErro(null);
-          }
+        if (d.url === apiUrlRef.current && statusRef.current === "conectado") return;
+        // Tunnel pode estar iniciando — tenta ate 4 vezes com 10s de intervalo
+        for (let i = 0; i < 4; i++) {
+          if (!ativo) return;
+          if (i > 0) await new Promise<void>(r => setTimeout(r, 10_000));
+          if (!ativo) return;
+          if (await testar(d.url)) { aplicarUrl(d.url); return; }
         }
       };
 
@@ -274,6 +282,29 @@ export default function SgdwConexao({
     pendingDataLoad.current = false;
     buscarDados(apiUrlRef.current, anoInicio, mesInicio, anoFim, mesFim);
   }, [status, buscarDados, anoInicio, mesInicio, anoFim, mesFim]);
+
+  // Background check silencioso em "erro" — fallback para quando SSE disparou mas tunnel ainda iniciava
+  useEffect(() => {
+    if (status !== "erro") return;
+    let cancelado = false;
+    const checar = async () => {
+      if (cancelado) return;
+      const { url: fbUrl, at } = await lerUrlFirebaseDireto();
+      if (cancelado) return;
+      if (at) setFirebaseAt(at);
+      if (fbUrl && await testar(fbUrl)) {
+        if (cancelado) return;
+        apiUrlRef.current = fbUrl;
+        setApiUrl(fbUrl);
+        setStatus("conectado");
+        setErro(null);
+        pendingDataLoad.current = true;
+        if (typeof window !== "undefined") localStorage.setItem(LS_URL_KEY, fbUrl);
+      }
+    };
+    const id = setInterval(checar, 20_000);
+    return () => { cancelado = true; clearInterval(id); };
+  }, [status]);
 
   if (status !== "conectado" && dados === null) {
     return (
