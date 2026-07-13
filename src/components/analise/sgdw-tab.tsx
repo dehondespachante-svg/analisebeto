@@ -62,11 +62,8 @@ async function registrarUrlFirebase(url: string): Promise<void> {
 
 async function testar(url: string): Promise<boolean> {
   try {
-    const res = await fetch(`${url}/api/sgdw-query`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ sql: "SELECT 1 AS PING FROM RDB$DATABASE" }),
-      signal: AbortSignal.timeout(5000),
+    const res = await fetch(`${url}/api/status`, {
+      signal: AbortSignal.timeout(8000),
     });
     return res.ok;
   } catch { return false; }
@@ -196,9 +193,9 @@ export default function SgdwConexao({
   const autoConectar = useCallback(async () => {
     setStatus("conectando"); setErro(null);
     if (await testar(URL_LOCAL)) { setApiUrl(URL_LOCAL); setStatus("conectado"); return URL_LOCAL; }
-    // Tenta Firebase com ate 4 tentativas — tunnel pode estar trocando de URL
-    for (let i = 0; i < 4; i++) {
-      if (i > 0) await new Promise<void>(r => setTimeout(r, 5000));
+    // Tenta Firebase com ate 5 tentativas — tunnel pode estar inicializando
+    for (let i = 0; i < 5; i++) {
+      if (i > 0) await new Promise<void>(r => setTimeout(r, 8000));
       const { url: tunnelUrl, at } = await lerUrlFirebaseDireto();
       if (at) setFirebaseAt(at);
       if (tunnelUrl && await testar(tunnelUrl)) {
@@ -207,7 +204,7 @@ export default function SgdwConexao({
         if (typeof window !== "undefined") localStorage.setItem(LS_URL_KEY, tunnelUrl);
         return tunnelUrl;
       }
-      setErro(`Tentativa ${i + 1}/4 — aguardando tunnel...\n${tunnelUrl ?? "Firebase sem URL"}`);
+      setErro(`Tentativa ${i + 1}/5 — aguardando tunnel...\n${tunnelUrl ?? "Firebase sem URL"}`);
     }
     const { url: ultimaUrl, at: ultimaAt } = await lerUrlFirebaseDireto();
     if (ultimaAt) setFirebaseAt(ultimaAt);
