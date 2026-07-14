@@ -6,7 +6,6 @@ export const runtime = "nodejs";
 const TOKEN = process.env.SGDW_API_TOKEN || "";
 
 const RTDB = "https://beto-58a10-default-rtdb.firebaseio.com/sgdw-tunnel.json";
-const LOCAL_PORT = process.env.LOCAL_API_PORT || "8787";
 
 let urlCache: { url: string; at: number } | null = null;
 const URL_TTL = 15_000; // 15s — baixo para pegar nova URL rápido
@@ -23,9 +22,11 @@ async function fetchFromRtdb(): Promise<string | null> {
 }
 
 async function resolveBase(forceRefresh = false): Promise<string> {
-  if (!process.env.VERCEL_URL) {
-    return `http://localhost:${LOCAL_PORT}`;
+  // Acesso direto via LAN (quando dev e SGDW estao na mesma rede — configura em .env.local)
+  if (process.env.SGDW_LOCAL_URL) {
+    return process.env.SGDW_LOCAL_URL.trim();
   }
+  // Producao e dev local: sempre lê URL do tunnel no Firebase RTDB
   if (!forceRefresh && urlCache && Date.now() - urlCache.at < URL_TTL) {
     return urlCache.url;
   }
@@ -166,11 +167,10 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  const isLocal = !process.env.VERCEL_URL;
   try {
-    const base = await resolveBase();
-    return NextResponse.json({ ok: true, modo: isLocal ? "local" : "tunnel", tunnelAt: urlCache?.at ?? null });
+    await resolveBase();
+    return NextResponse.json({ ok: true, tunnelAt: urlCache?.at ?? null });
   } catch {
-    return NextResponse.json({ ok: false, modo: isLocal ? "local" : "tunnel" }, { status: 503 });
+    return NextResponse.json({ ok: false }, { status: 503 });
   }
 }
