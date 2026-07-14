@@ -2,39 +2,25 @@
 
 import type { SgdwConfig, SgdwDados, SgdwLinhaBruta, SgdwPeriodo, SgdwServico, SgdwPaginaDados } from "./types";
 
-const URL_KEY = "sgdw:url";
-const TOKEN_KEY = "sgdw:token";
-
 const MESES: Record<number, string> = {
   1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
   7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez",
 };
 
-export function carregarConfigSgdw(): SgdwConfig {
-  if (typeof window === "undefined") return { url: "http://localhost:8787", token: "" };
-  return {
-    url: localStorage.getItem(URL_KEY) || "http://localhost:8787",
-    token: localStorage.getItem(TOKEN_KEY) || "",
-  };
-}
-
-export function salvarConfigSgdw(config: SgdwConfig): void {
-  localStorage.setItem(URL_KEY, config.url.replace(/\/$/, ""));
-  localStorage.setItem(TOKEN_KEY, config.token.trim());
-}
-
-async function sgdwPost<T>(config: SgdwConfig, endpoint: string, body: unknown): Promise<T> {
-  const base = config.url.replace(/\/$/, "");
-  const resp = await fetch(`${base}${endpoint}`, {
+// Todas as chamadas ao Firebird passam pelo relay server-side (/api/sgdw-relay).
+// O token e a URL do tunnel ficam no servidor — nunca chegam ao browser.
+async function sgdwPost<T>(_config: SgdwConfig, _endpoint: string, body: unknown): Promise<T> {
+  const resp = await fetch("/api/sgdw-relay", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.token}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(20000),
   });
 
+  if (resp.status === 503) {
+    const err = (await resp.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? "SGDW indisponivel. Verifique se o iniciar.bat esta rodando.");
+  }
   if (resp.status === 401) throw new Error("Token invalido ou nao autorizado.");
   if (!resp.ok) {
     const txt = await resp.text().catch(() => "");
@@ -122,8 +108,10 @@ export async function buscarHonorariosSgdw(
   const dataInicio = `${anoInicio}-${pad(mesInicio)}-01`;
   const dataFim    = `${anoFim}-${pad(mesFim)}-31`;
 
+  // Limite alto: query ja e agrupada (ano+mes+servico), entao 100k grupos e impossivel na pratica
+  const LIMITE_GRUPOS = 100_000;
   const result = await sgdwPost<{ rows: SgdwLinhaBruta[] }>(config, "/api/sgdw-query", {
-    sql: `SELECT FIRST 5000
+    sql: `SELECT FIRST ${LIMITE_GRUPOS}
        EXTRACT(YEAR FROM o.orddtemi) AS ANO,
        EXTRACT(MONTH FROM o.orddtemi) AS MES,
        COALESCE(s.sernumer, 0) AS CODIGO_SERVICO,
@@ -201,6 +189,7 @@ export async function buscarHonorariosSgdw(
     totalQuantidade,
     taxaGlobal: totalHonorarios > 0 ? totalRecebido / totalHonorarios : 0,
     geradoEm: new Date().toISOString(),
+    truncado: linhas.length >= LIMITE_GRUPOS,
   };
 }
 

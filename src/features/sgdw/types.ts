@@ -41,6 +41,7 @@ export type SgdwDados = {
   totalQuantidade: number;
   taxaGlobal: number;
   geradoEm: string;
+  truncado?: boolean;
 };
 
 export type SgdwExplorerAba =

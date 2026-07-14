@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic"; // nunca cachear esta rota
 
-const TOKEN = "6ad74bc2cdc8d84953ea21ad89c25715d49ad614757b8aea5c599050b5d6e6dc";
+const TOKEN = process.env.SGDW_API_TOKEN || "";
 // Firebase Realtime Database — persiste sem precisar de regras Firestore
 const RTDB = "https://beto-58a10-default-rtdb.firebaseio.com/sgdw-tunnel.json";
 // URL de producao — usada como fallback quando rodando localmente (dev server)
